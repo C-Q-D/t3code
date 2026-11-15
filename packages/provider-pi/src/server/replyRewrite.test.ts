@@ -854,10 +854,6 @@ it.effect("does not accept ordinary, legacy or other-version notifications as re
         notification({ version: "1", kind: "ready" }),
         { ...notification({ kind: "ready" }), method: "setStatus" },
         { ...notification({ kind: "ready" }), notifyType: "warning" },
-        {
-          ...notification({ kind: "ready" }),
-          message: notification({ kind: "ready" }).message + " ".repeat(4_096),
-        },
         { type: "t3_reply_rewrite", kind: "ready", version: 1 },
       ],
     });
@@ -865,6 +861,23 @@ it.effect("does not accept ordinary, legacy or other-version notifications as re
     yield* Deferred.await(pi.held);
     yield* TestClock.adjust(input.timeoutMs);
     assert.equal((yield* Fiber.join(fiber)).code, "timeout");
+    assert.isFalse(pi.received.some((record) => record["type"] === "prompt"));
+    yield* pi.runner.awaitIdle;
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("rejects oversized protocol ready before sending a prompt", () =>
+  Effect.gen(function* () {
+    const pi = yield* makeFakePi({
+      readyEvents: [
+        {
+          ...notification({ kind: "ready" }),
+          message: notification({ kind: "ready" }).message + " ".repeat(4_096),
+        },
+      ],
+    });
+    const error = yield* pi.runner.run(input).pipe(Effect.flip);
+    assert.equal(error.code, "protocol");
     assert.isFalse(pi.received.some((record) => record["type"] === "prompt"));
     yield* pi.runner.awaitIdle;
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
