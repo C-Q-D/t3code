@@ -144,10 +144,6 @@ function ReplyRewriteReading({
   const request = useAtomCommand(replyRewriteEnvironment.request);
   const cancel = useAtomCommand(replyRewriteEnvironment.cancel);
   const [busy, setBusy] = useState(false);
-  const [unconfirmedRequest, setUnconfirmedRequest] = useState<{
-    signature: string;
-    requestId: string;
-  } | null>(null);
   const readingInput = {
     identity,
     sourceText,
@@ -180,16 +176,7 @@ function ReplyRewriteReading({
     if (!allowed || active || busy) return;
     setBusy(true);
     try {
-      const signature = JSON.stringify([target, sourceText]);
-      const requestId =
-        unconfirmedRequest?.signature === signature ? unconfirmedRequest.requestId : randomUUID();
-      const result = await request({ environmentId, input: { ...target, requestId } });
-      const failure = result._tag === "Failure" ? Cause.squash(result.cause) : null;
-      setUnconfirmedRequest(
-        result._tag === "Failure" && !isRewriteError(failure) && !isAuthorizationError(failure)
-          ? { signature, requestId }
-          : null,
-      );
+      await request({ environmentId, input: { ...target, sourceText, requestId: randomUUID() } });
     } finally {
       refresh();
       setBusy(false);
