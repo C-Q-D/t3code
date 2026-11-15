@@ -45,6 +45,7 @@ import * as EventStore from "./EventStore.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
+import { projectThreadProjectionForWire } from "./WireProjection.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -1786,6 +1787,7 @@ layer("ProviderEventIngestorV2", (it) => {
             nodeId: childRootNodeId,
             role: "assistant",
             text: "Subagent result",
+            replyClassification: { kind: "final", source: "codex_phase" },
             attachments: [],
             streaming: false,
             createdAt: now,
@@ -1798,6 +1800,14 @@ layer("ProviderEventIngestorV2", (it) => {
       assert.equal(threadEvents[0]?.threadId, childThreadId);
       assert.equal(messageEvents[0]?.type, "message.updated");
       assert.equal(messageEvents[0]?.threadId, childThreadId);
+      const sink = yield* EventSink.EventSinkV2;
+      yield* sink.write({ events: [rootEvent, ...threadEvents, ...messageEvents] });
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const saved = yield* projections.getThreadProjection(childThreadId);
+      assert.deepEqual(projectThreadProjectionForWire(saved).messages[0]?.replyClassification, {
+        kind: "final",
+        source: "codex_phase",
+      });
     }),
   );
 

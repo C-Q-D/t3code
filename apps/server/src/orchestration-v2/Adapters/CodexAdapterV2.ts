@@ -1934,6 +1934,31 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         const deferredRootTerminals = yield* Ref.make(new Map<string, DeferredCodexRootTerminal>());
         const offeredContinuationItemsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const finalAnswerItemIdsByTurn = yield* Ref.make(new Map<string, Set<string>>());
+        const replyClassificationsByTurn = new Map<
+          string,
+          Map<string, NonNullable<OrchestrationV2ConversationMessage["replyClassification"]>>
+        >();
+        const rememberReplyPhase = (
+          turnId: string,
+          item: { readonly id: string; readonly phase?: string | null },
+        ) => {
+          const items = replyClassificationsByTurn.get(turnId) ?? new Map();
+          items.set(
+            item.id,
+            item.phase == null
+              ? { kind: "final", source: "codex_legacy_phase" }
+              : {
+                  kind:
+                    item.phase === "final_answer"
+                      ? "final"
+                      : item.phase === "partial_answer"
+                        ? "partial"
+                        : "commentary",
+                  source: "codex_phase",
+                },
+          );
+          replyClassificationsByTurn.set(turnId, items);
+        };
         const completedFinalAnswerTextsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const imageTurns = new Map<
           string,
@@ -2315,6 +2340,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return updated;
             });
             imageTurns.delete(nativeTurnId);
+            replyClassificationsByTurn.delete(nativeTurnId);
             yield* Ref.update(finalAnswerItemIdsByTurn, (current) => {
               if (!current.has(nativeTurnId)) {
                 return current;
@@ -3313,6 +3339,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           context: ActiveCodexTurnContext,
           item: { readonly id: string; readonly text: string },
           completed: boolean,
+          replyClassification?: OrchestrationV2ConversationMessage["replyClassification"],
         ) {
           const updatedAt = yield* DateTime.now;
           const completedAt = completed ? updatedAt : null;
@@ -3347,6 +3374,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             completedAt,
           };
           const message: OrchestrationV2ConversationMessage = {
+            replyClassification: replyClassification ?? { kind: "unknown", source: "unknown" },
             createdBy: "agent",
             creationSource: "provider",
             id: messageId,
@@ -3376,6 +3404,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             completedAt,
             updatedAt,
             type: "assistant_message",
+            replyClassification: message.replyClassification,
             messageId,
             text: item.text,
             streaming: !completed,
@@ -3509,6 +3538,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 context,
                 { id: update.itemId, text: update.text },
                 update.completed,
+                replyClassificationsByTurn.get(update.turnId)?.get(update.itemId),
               );
               yield* emitProviderEvent({
                 type: "node.updated",
@@ -4846,6 +4876,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }
 
             if (payload.item.type === "agentMessage") {
+              rememberReplyPhase(payload.turnId, payload.item);
               if (payload.item.phase == null || payload.item.phase === "final_answer") {
                 yield* Ref.update(finalAnswerItemIdsByTurn, (current) => {
                   const updated = new Map(current);
@@ -5210,6 +5241,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }
 
             const finalAnswer = payload.item.phase == null || payload.item.phase === "final_answer";
+            rememberReplyPhase(payload.turnId, payload.item);
             if (finalAnswer) {
               yield* Ref.update(finalAnswerItemIdsByTurn, (current) => {
                 const updated = new Map(current);

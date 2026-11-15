@@ -4648,6 +4648,13 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             assistantMessages(harness.events).map((event) => event.message.text),
             ["CODEX_RECOVERY_OK", "CODEX_RECOVERY_OK"],
           );
+          assert.deepEqual(
+            assistantMessages(harness.events).map((event) => event.message.replyClassification),
+            [
+              { kind: "partial", source: "codex_phase" },
+              { kind: "final", source: "codex_phase" },
+            ],
+          );
         }).pipe(
           Effect.provide(
             Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
