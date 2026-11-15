@@ -10,8 +10,9 @@ const CITATION_PROTOCOL = "t3-citation:";
 const CITATION_HREF_PREFIX = `${CITATION_PROTOCOL}//v1/`;
 const CITATION_V2_HREF_PREFIX = `${CITATION_PROTOCOL}//v2/`;
 // Percent encoding needs up to nine characters per UTF-16 code unit; 16k covers selectors.
-const MAX_CITATION_HREF_LENGTH =
+const MAX_CITATION_V1_HREF_LENGTH =
   9 * (ASSISTANT_CITATION_MAX_TEXT_LENGTH + ASSISTANT_CITATION_MAX_COMMENT_LENGTH) + 16_000;
+const MAX_CITATION_HREF_LENGTH = MAX_CITATION_V1_HREF_LENGTH + 9 * 512;
 const CITATION_LINK = new RegExp(
   String.raw`\[Assistant quote\]\((${CITATION_PROTOCOL}//v[12]/[^\s)]{1,${MAX_CITATION_HREF_LENGTH - CITATION_HREF_PREFIX.length}})\)`,
   "g",
@@ -57,7 +58,10 @@ export function formatAssistantCitationHref(citation: AssistantCitation): string
 export function parseAssistantCitationHref(href: string): AssistantCitation | null {
   if (
     (!href.startsWith(CITATION_HREF_PREFIX) && !href.startsWith(CITATION_V2_HREF_PREFIX)) ||
-    href.length > MAX_CITATION_HREF_LENGTH
+    href.length >
+      (href.startsWith(CITATION_HREF_PREFIX)
+        ? MAX_CITATION_V1_HREF_LENGTH
+        : MAX_CITATION_HREF_LENGTH)
   ) {
     return null;
   }

@@ -145,37 +145,47 @@ describe("assistant citation references", () => {
     ).toBeNull();
   });
 
-  it("accepts complete 8k CJK quotes and comments with maximum-sized source selectors", () => {
-    const largeCitation: AssistantCitation = {
-      ...citation,
-      environmentId: EnvironmentId.make("環".repeat(512)),
-      threadId: ThreadId.make("線".repeat(512)),
-      messageId: MessageId.make("文".repeat(512)),
-      text: "引".repeat(ASSISTANT_CITATION_MAX_TEXT_LENGTH),
-      comment: "注".repeat(ASSISTANT_CITATION_MAX_COMMENT_LENGTH),
-      start: Number.MAX_SAFE_INTEGER - ASSISTANT_CITATION_MAX_TEXT_LENGTH,
-      end: Number.MAX_SAFE_INTEGER,
-      prefix: "前".repeat(ASSISTANT_CITATION_CONTEXT_LENGTH),
-      suffix: "後".repeat(ASSISTANT_CITATION_CONTEXT_LENGTH),
-    };
-    const href = formatAssistantCitationHref(largeCitation);
-    const marker = serializeAssistantCitation(largeCitation);
+  it.each([1, 2] as const)(
+    "accepts complete 8k CJK quotes with maximum-sized v%s selectors",
+    (version) => {
+      const largeCitation: AssistantCitation = {
+        ...citation,
+        ...(version === 1
+          ? { version }
+          : {
+              version,
+              source: "rewrite" as const,
+              rewriteRequestId: "版".repeat(512),
+            }),
+        environmentId: EnvironmentId.make("環".repeat(512)),
+        threadId: ThreadId.make("線".repeat(512)),
+        messageId: MessageId.make("文".repeat(512)),
+        text: "引".repeat(ASSISTANT_CITATION_MAX_TEXT_LENGTH),
+        comment: "注".repeat(ASSISTANT_CITATION_MAX_COMMENT_LENGTH),
+        start: Number.MAX_SAFE_INTEGER - ASSISTANT_CITATION_MAX_TEXT_LENGTH,
+        end: Number.MAX_SAFE_INTEGER,
+        prefix: "前".repeat(ASSISTANT_CITATION_CONTEXT_LENGTH),
+        suffix: "後".repeat(ASSISTANT_CITATION_CONTEXT_LENGTH),
+      };
+      const href = formatAssistantCitationHref(largeCitation);
+      const marker = serializeAssistantCitation(largeCitation);
 
-    expect(href.length).toBeGreaterThan(100_000);
-    expect(parseAssistantCitationHref(href)).toStrictEqual(largeCitation);
-    expect(collectAssistantCitations(marker)).toEqual([
-      { citation: largeCitation, source: marker, start: 0, end: marker.length },
-    ]);
-    expect(readProviderContext(expandAssistantCitationsForProvider(marker))).toEqual([
-      { id: "assistant-quote-1", citation: largeCitation },
-    ]);
-    expect(assistantCitationsToPlainText(marker)).toBe(
-      `${largeCitation.text}\nComment: ${largeCitation.comment}`,
-    );
-    expect(renderAssistantCitationsAsText(marker)).toBe(
-      `\n\n> Assistant quote:\n> ${largeCitation.text}\n\nComment: ${largeCitation.comment}\n\n`,
-    );
-  });
+      expect(href.length).toBeGreaterThan(100_000);
+      expect(parseAssistantCitationHref(href)).toStrictEqual(largeCitation);
+      expect(collectAssistantCitations(marker)).toEqual([
+        { citation: largeCitation, source: marker, start: 0, end: marker.length },
+      ]);
+      expect(readProviderContext(expandAssistantCitationsForProvider(marker))).toEqual([
+        { id: "assistant-quote-1", citation: largeCitation },
+      ]);
+      expect(assistantCitationsToPlainText(marker)).toBe(
+        `${largeCitation.text}\nComment: ${largeCitation.comment}`,
+      );
+      expect(renderAssistantCitationsAsText(marker)).toBe(
+        `\n\n> Assistant quote:\n> ${largeCitation.text}\n\nComment: ${largeCitation.comment}\n\n`,
+      );
+    },
+  );
 
   it("edits only the bound comment and trims only its outer whitespace", () => {
     const original = Object.freeze({ ...citation, comment: "Previous comment" });
