@@ -4808,6 +4808,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     );
 
     if (steeringPolicy === "active_steering") {
+      const command = input.command;
+      const replyRewrite =
+        command.type === "message.dispatch"
+          ? command.replyRewrite
+          : input.projection.runs.find((run) => run.id === command.queuedRunId)?.replyRewrite;
       const instanceChanged =
         input.projection.thread.providerInstanceId !== input.modelSelection.instanceId;
       if (
@@ -4843,6 +4848,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           threadId: input.command.threadId,
           request: {
             type: "provider-turn.steer",
+            ...(replyRewrite === undefined ? {} : { replyRewrite }),
             providerSessionId,
             providerThreadId: providerThread.id,
             providerTurnId: providerTurn.id,

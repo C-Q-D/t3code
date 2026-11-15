@@ -384,13 +384,15 @@ const make = Effect.gen(function* () {
       ];
       if (completedRuns.length === 0) return;
       const config = (yield* settings.getSettings).replyRewrite;
-      if (!config.auto || Option.isNone(runner)) return;
+      if (Option.isNone(runner)) return;
       for (const run of completedRuns) {
         const messages = yield* sql<{
           message_id: string;
-        }>`SELECT message_id FROM orchestration_v2_projection_messages
-        WHERE thread_id = ${run.threadId} AND run_id = ${run.runId} AND role = 'assistant' AND streaming = 0
-          AND json_extract(payload_json, '$.replyClassification.kind') = 'final'`;
+        }>`SELECT m.message_id FROM orchestration_v2_projection_messages m
+        JOIN orchestration_v2_projection_runs r ON r.run_id = m.run_id AND r.thread_id = m.thread_id
+        WHERE m.thread_id = ${run.threadId} AND m.run_id = ${run.runId} AND m.role = 'assistant' AND m.streaming = 0
+          AND json_extract(m.payload_json, '$.replyClassification.kind') = 'final'
+          AND COALESCE(json_extract(r.payload_json, '$.replyRewrite'), ${config.auto ? 1 : 0}) = 1`;
         for (const message of messages) {
           const target = { ...run, messageId: MessageId.make(message.message_id) };
           const original = yield* source(target);

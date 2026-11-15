@@ -291,6 +291,7 @@ function launchInput(input: {
   readonly command: string;
   readonly thread: string;
   readonly message?: string;
+  readonly replyRewrite?: boolean;
   readonly workspace?: ThreadLaunch.ThreadLaunchWorkspaceStrategy;
 }) {
   return {
@@ -306,6 +307,7 @@ function launchInput(input: {
       ? {}
       : {
           initialMessage: {
+            ...(input.replyRewrite === undefined ? {} : { replyRewrite: input.replyRewrite }),
             messageId: MessageId.make(`${input.message}:id`),
             text: input.message,
             attachments: [],
@@ -1295,6 +1297,7 @@ it.effect.each(["fails", "is interrupted"] as const)(
             command: `command:launch:queued-setup-${ending}`,
             thread: `thread:launch:queued-setup-${ending}`,
             message: "First message",
+            replyRewrite: true,
             workspace: { type: "worktree", baseRef: "main", startFromOrigin: true },
           }),
         );
@@ -1305,12 +1308,15 @@ it.effect.each(["fails", "is interrupted"] as const)(
           threadId: launched.threadId,
           messageId: MessageId.make(`message:launch:queued-setup-${ending}:follow-up`),
           text: "Sent during setup",
+          replyRewrite: false,
           attachments: [],
           mode: "queue",
           createdBy: "user",
           creationSource: "web",
         });
         assert.equal(queued.delivery, "queued");
+        assert.isTrue(launched.projection.runs[0]?.replyRewrite);
+        assert.isFalse(queued.run.replyRewrite);
         if (ending === "fails") {
           yield* Deferred.succeed(allowFetch, undefined);
         } else {
@@ -1341,6 +1347,8 @@ it.effect.each(["fails", "is interrupted"] as const)(
           });
           const retried = yield* threads.getThreadProjection(launched.threadId);
           assert.equal(retried.runs.at(-1)?.queueHeld, false);
+          assert.isTrue(retried.runs[0]?.replyRewrite);
+          assert.isFalse(retried.runs.at(-1)?.replyRewrite);
         }
       }).pipe(Effect.provide(harness.layer));
     }),
@@ -2450,6 +2458,7 @@ it.effect("replays an accepted send after the project disables the instance", ()
       threadId: created.threadId,
       messageId: MessageId.make("message:send:retry-after-disable"),
       text: "Hello again",
+      replyRewrite: true,
       attachments: [],
       mode: "auto" as const,
       createdBy: "user" as const,
@@ -2465,6 +2474,8 @@ it.effect("replays an accepted send after the project disables the instance", ()
 
     const retry = yield* ThreadMessageIntake.sendToThread(sendInput);
     assert.equal(retry.message.id, first.message.id);
+    assert.isTrue(first.run.replyRewrite);
+    assert.isTrue(retry.run.replyRewrite);
 
     const fresh = yield* ThreadMessageIntake.sendToThread({
       ...sendInput,

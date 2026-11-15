@@ -1,4 +1,5 @@
 import { assert, it } from "@effect/vitest";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   CommandId,
   EventId,
@@ -22,6 +23,8 @@ import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -66,13 +69,16 @@ const makeControlledRunner = Effect.gen(function* () {
   return { calls, runner };
 });
 
-function testLayer(runner?: Runner.ReplyRewriteRunner["Service"]) {
+function testLayer(
+  runner?: Runner.ReplyRewriteRunner["Service"],
+  databaseLayer = Persistence.layerMemory,
+) {
   const shared = Layer.mergeAll(
     Outbox.layer,
     ProjectionStore.layer,
     EventStore.layer,
     Settings.layerTest(),
-  ).pipe(Layer.provideMerge(Persistence.layerMemory));
+  ).pipe(Layer.provideMerge(databaseLayer));
   const earlySink = EventSink.layer.pipe(Layer.provide(shared));
   const serviceBase = Service.layer.pipe(Layer.provide(Layer.merge(earlySink, shared)));
   const service =
@@ -95,6 +101,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
     sideChat?: boolean;
     suffix?: string;
     driver?: string;
+    replyRewrite?: boolean | undefined;
   } = {},
 ) {
   const now = yield* DateTime.now;
@@ -140,6 +147,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
     modelSelection,
     providerThreadId,
     userMessageId: MessageId.make(`message:user${suffix}`),
+    ...(options.replyRewrite === undefined ? {} : { replyRewrite: options.replyRewrite }),
     rootNodeId: null,
     activeAttemptId: null,
     status: options.status ?? "completed",
@@ -222,7 +230,7 @@ it.effect(
     Effect.gen(function* () {
       const controlled = yield* makeControlledRunner;
       yield* Effect.gen(function* () {
-        const fixture = yield* seed();
+        const fixture = yield* seed({ replyRewrite: false });
         const service = yield* Service.ReplyRewriteService;
         const worker = yield* Worker.ReplyRewriteWorker;
         const settings = yield* Settings.ServerSettingsService;
@@ -279,7 +287,7 @@ it.effect("keeps the old success during regeneration and after failure", () =>
   Effect.gen(function* () {
     const controlled = yield* makeControlledRunner;
     yield* Effect.gen(function* () {
-      const { target } = yield* seed();
+      const { target } = yield* seed({ replyRewrite: false });
       const service = yield* Service.ReplyRewriteService;
       const worker = yield* Worker.ReplyRewriteWorker;
       yield* service.request({ ...target, requestId: "first" });
@@ -461,18 +469,94 @@ it.effect(
     }).pipe(Effect.provide(testLayer())),
 );
 
-it.effect(
+it.effect.each([true, false])(
+  "keeps rewrite=%s after closing and reopening the database",
+  (replyRewrite) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const databasePath = path.join(
+        yield* fs.makeTempDirectoryScoped({ prefix: "t3-rewrite-reopen-" }),
+        "state.sqlite",
+      );
+      const controlled = yield* makeControlledRunner;
+      const layer = testLayer(
+        controlled.runner,
+        Persistence.layerFromPath(databasePath).pipe(
+          Layer.provide(NodeServices.layer),
+          Layer.orDie,
+        ),
+      );
+      const fixture = yield* seed({
+        status: "running",
+        replyRewrite,
+        classification: { kind: "final", source: "codex_phase" },
+      }).pipe(Effect.provide(layer), Effect.scoped);
+      yield* Effect.gen(function* () {
+        const service = yield* Service.ReplyRewriteService;
+        yield* service.recover;
+        yield* (yield* Settings.ServerSettingsService).updateSettings({
+          replyRewrite: { auto: !replyRewrite },
+        });
+        const projections = yield* ProjectionStore.ProjectionStoreV2;
+        const restored = (yield* projections.getThreadProjection(fixture.target.threadId)).runs[0]!;
+        assert.equal(restored.replyRewrite, replyRewrite);
+        yield* (yield* EventSink.EventSinkV2).write({
+          events: [
+            fixture.event({ type: "run.updated", payload: { ...restored, status: "completed" } }),
+          ],
+        });
+        assert.equal(
+          (yield* service.getDetail(fixture.target))?.currentAttempt?.status ?? null,
+          replyRewrite ? "queued" : null,
+        );
+      }).pipe(Effect.provide(layer), Effect.scoped);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect.each([
+  { auto: false, replyRewrite: true, expected: true },
+  { auto: true, replyRewrite: false, expected: false },
+  { auto: true, replyRewrite: true, expected: true },
+  { auto: false, replyRewrite: false, expected: false },
+  { auto: true, replyRewrite: undefined, expected: true },
+  { auto: false, replyRewrite: undefined, expected: false },
+])("uses the durable run rewrite decision with legacy auto fallback: %j", (options) =>
+  Effect.gen(function* () {
+    const controlled = yield* makeControlledRunner;
+    yield* Effect.gen(function* () {
+      const fixture = yield* seed({
+        replyRewrite: options.replyRewrite,
+        classification: { kind: "final", source: "codex_phase" },
+      });
+      yield* (yield* Settings.ServerSettingsService).updateSettings({
+        replyRewrite: { auto: options.auto },
+      });
+      yield* fixture.sink.write({
+        events: [fixture.event({ type: "run.updated", payload: fixture.run })],
+      });
+      const record = yield* (yield* Service.ReplyRewriteService).getDetail(fixture.target);
+      assert.equal(record?.currentAttempt?.status ?? null, options.expected ? "queued" : null);
+    }).pipe(Effect.provide(testLayer(controlled.runner)));
+  }),
+);
+
+it.effect.each([
+  { auto: true, replyRewrite: undefined },
+  { auto: false, replyRewrite: true },
+])(
   "enqueues all confirmed finals only after the user run succeeds, excluding progress and legacy unknown",
-  () =>
+  ({ auto, replyRewrite }) =>
     Effect.gen(function* () {
       const controlled = yield* makeControlledRunner;
       yield* Effect.gen(function* () {
         const fixture = yield* seed({
           status: "running",
           classification: { kind: "final", source: "codex_phase" },
+          replyRewrite,
         });
         const settings = yield* Settings.ServerSettingsService;
-        yield* settings.updateSettings({ replyRewrite: { auto: true } });
+        yield* settings.updateSettings({ replyRewrite: { auto } });
         yield* fixture.sink.write({
           events: [
             fixture.event({
@@ -542,6 +626,17 @@ it.effect(
           "Second final.",
           "Source reply.\r\nSecond line.",
         ]);
+        yield* fixture.sink.write({
+          events: [
+            fixture.event({
+              type: "run.updated",
+              payload: { ...fixture.run, status: "completed" },
+            }),
+            fixture.event({ type: "message.updated", payload: fixture.message }),
+          ],
+        });
+        assert.equal(yield* worker.drain, 0);
+        assert.equal((yield* service.getDetail(fixture.target))?.currentAttempt?.generation, 1);
         const sql = yield* SqlClient.SqlClient;
         assert.equal(
           (yield* sql<{ count: number }>`SELECT count(*) AS count FROM reply_rewrites`)[0]?.count,
@@ -562,6 +657,7 @@ it.effect.each([
     yield* Effect.gen(function* () {
       const fixture = yield* seed({
         ...options,
+        replyRewrite: true,
         classification: { kind: "final", source: "codex_phase" },
       });
       const settings = yield* Settings.ServerSettingsService;

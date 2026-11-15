@@ -2141,6 +2141,9 @@ export const layerWsRpc = (
                       ? {}
                       : {
                           initialMessage: {
+                            ...(input.initialMessage.replyRewrite === undefined
+                              ? {}
+                              : { replyRewrite: input.initialMessage.replyRewrite }),
                             ...(input.initialMessage.messageId === undefined
                               ? {}
                               : { messageId: input.initialMessage.messageId }),

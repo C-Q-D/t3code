@@ -185,6 +185,7 @@ it.effect.each(
           threadId,
           messageId: MessageId.make("message:first"),
           text: "first",
+          replyRewrite: false,
           attachments: [],
           dispatchMode: { type: "start_immediately" },
           createdBy: "user",
@@ -196,6 +197,9 @@ it.effect.each(
         yield* worker.drain();
         yield* Fiber.join(running);
         const first = started[0]!;
+        assert.equal(first.message.text, "first");
+        assert.notProperty(first.message, "replyRewrite");
+        assert.notProperty(first, "replyRewrite");
         const messageId = MessageId.make("message:steering");
         const taskId = NodeId.make("task:mailbox");
         if (mailbox) {
@@ -260,6 +264,7 @@ it.effect.each(
           threadId,
           messageId,
           text: "fix the popover",
+          replyRewrite: true,
           attachments: [
             {
               type: "image",
@@ -351,6 +356,11 @@ it.effect.each(
         yield* worker.drain();
         yield* orchestrator.resumeQueuedRuns;
         yield* worker.drain();
+        assert.isFalse(
+          (yield* orchestrator.getThreadProjection(threadId)).runs.find(
+            (run) => run.id === first.runId,
+          )?.replyRewrite,
+        );
         if (timing === "after delivery") {
           assert.equal(steerCalls, 1);
           assert.equal(started.length, 1);
@@ -398,6 +408,9 @@ it.effect.each(
         ]);
         assert.equal(steerCalls, timing === "during delivery" ? 1 : 0);
         const final = yield* orchestrator.getThreadProjection(threadId);
+        assert.isFalse(final.runs.find((run) => run.id === first.runId)?.replyRewrite);
+        assert.isTrue(final.runs.find((run) => run.id === started[1]?.runId)?.replyRewrite);
+        assert.notProperty(started[1]!.message, "replyRewrite");
         if (!mailbox) {
           assert.equal(
             final.turnItems.find(

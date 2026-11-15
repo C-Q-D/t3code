@@ -106,6 +106,13 @@ it.layer(layerTest)("DispatchModeLimit", (it) => {
       assert.equal(projection.runs[0]?.replyRewrite, expected);
       assert.equal(projection.runs[1]?.replyRewrite, override ?? !auto);
       assert.equal(projection.runs[1]?.status, "queued");
+      yield* orchestrator.dispatch({
+        ...queued,
+        commandId: CommandId.make(`default:${threadId}`),
+        messageId: MessageId.make(`default:${threadId}`),
+        replyRewrite: undefined,
+      });
+      assert.equal((yield* projections.getThreadProjection(threadId)).runs[2]?.replyRewrite, !auto);
       assert.deepEqual(
         projection.messages.map((message) => message.text),
         ["Explain it.", "Explain it."],

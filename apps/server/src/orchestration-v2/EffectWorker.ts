@@ -291,6 +291,9 @@ export const layerExecutor: Layer.Layer<
                       .dispatch({
                         type: "message.dispatch",
                         commandId: CommandId.make(`command:steer-follow-up:${effect.id}`),
+                        ...(effect.request.replyRewrite === undefined
+                          ? {}
+                          : { replyRewrite: effect.request.replyRewrite }),
                         threadId: effect.threadId,
                         messageId: message.id,
                         text: message.text,
