@@ -335,6 +335,7 @@ describe("command permissions", () => {
                     reads++;
                     return null;
                   }),
+                [REPLY_REWRITE_WS_METHODS.subscribe]: () => Stream.never,
               },
             } as unknown as RpcSession),
           ),

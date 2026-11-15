@@ -7,15 +7,20 @@ import {
   type ReplyRewriteRequestInput,
   type ReplyRewriteRecord,
   type ReplyRewriteTargetInput,
+  type ThreadId,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Cause from "effect/Cause";
 import * as Schema from "effect/Schema";
+import * as Option from "effect/Option";
+import * as Stream from "effect/Stream";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
-import { requestGuarded } from "../rpc/client.ts";
+import { requestGuarded, subscribeDynamic } from "../rpc/client.ts";
 import { createEnvironmentQueryAtomFamily, createEnvironmentRpcCommand } from "./runtime.ts";
+import { createCommandPermissions } from "./commandPermissions.ts";
+import { followStreamInEnvironment } from "./environmentStreams.ts";
 
 const MAX_UNCONFIRMED_REQUESTS = 128;
 const unconfirmedRequests = Atom.make<
@@ -59,15 +64,81 @@ export interface ReplyRewriteDetailInput {
   readonly completionKey?: string;
 }
 
-/**
- * Queries on mount/reconnect and after explicit refresh. An active job permits at most 60 reads
- * per refresh, two seconds apart. Writes never retry; unknown outcomes require a detail read.
- */
+interface RewriteRevisions {
+  readonly revision: number;
+  readonly targets: ReadonlyMap<string, number>;
+  readonly allowed: boolean;
+}
+
+const revisionKey = (target: ReplyRewriteTargetInput) =>
+  JSON.stringify([target.runId, target.messageId]);
+
+/** Mounted details share one durable invalidation feed per destination thread. Writes never retry. */
 export function createReplyRewriteEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
 ) {
+  const permissions = createCommandPermissions(runtime, REPLY_REWRITE_WS_METHODS.subscribe);
+  const changes = Atom.family((key: string) => {
+    const { environmentId, threadId } = JSON.parse(key) as {
+      readonly environmentId: EnvironmentId;
+      readonly threadId: ThreadId;
+    };
+    return runtime
+      .atom((get) => {
+        const initial = Option.getOrElse(
+          Option.flatMap(
+            get.self<AsyncResult.AsyncResult<RewriteRevisions, unknown>>(),
+            AsyncResult.value,
+          ),
+          (): RewriteRevisions => ({ revision: 0, targets: new Map(), allowed: true }),
+        );
+        if (!get(permissions.permissionAtom(environmentId)))
+          return Stream.succeed({ ...initial, allowed: false });
+        let current = { ...initial, allowed: true };
+        const events = subscribeDynamic(REPLY_REWRITE_WS_METHODS.subscribe, () =>
+          Effect.sync(() => ({ threadId, afterRevision: current.revision })),
+        ).pipe(
+          Stream.filter(
+            (event) => event.threadId === threadId && event.revision > current.revision,
+          ),
+          Stream.map((event): RewriteRevisions => {
+            current = {
+              revision: event.revision,
+              targets: new Map(current.targets).set(revisionKey(event), event.revision),
+              allowed: true,
+            };
+            return current;
+          }),
+        );
+        return followStreamInEnvironment(
+          environmentId,
+          Stream.succeed(current).pipe(Stream.concat(events)),
+        );
+      })
+      .pipe(Atom.setIdleTTL(0));
+  });
+  const targetRevision = Atom.family((key: string) => {
+    const { environmentId, target } = JSON.parse(key) as {
+      readonly environmentId: EnvironmentId;
+      readonly target: ReplyRewriteTargetInput;
+    };
+    return Atom.make((get) => {
+      const result = get(changes(JSON.stringify({ environmentId, threadId: target.threadId })));
+      if (result._tag === "Failure") return -1;
+      const value = AsyncResult.getOrElse(result, () => null);
+      return value?.allowed === false ? -1 : (value?.targets.get(revisionKey(target)) ?? 0);
+    }).pipe(Atom.setIdleTTL(0));
+  });
   const detail = createEnvironmentQueryAtomFamily(runtime, {
     label: "environment-data:reply-rewrite",
+    idleTtlMs: 0,
+    refreshTrigger: ({
+      environmentId,
+      input,
+    }: {
+      readonly environmentId: EnvironmentId;
+      readonly input: ReplyRewriteDetailInput;
+    }) => targetRevision(JSON.stringify({ environmentId, target: input.target })),
     onAnswer: (
       target: { readonly environmentId: EnvironmentId; readonly input: ReplyRewriteDetailInput },
       record: ReplyRewriteRecord | null,
@@ -91,19 +162,9 @@ export function createReplyRewriteEnvironmentAtoms<R, E>(
         )
           acknowledgeSubmission(registry, key, unknown.requestId);
       }),
-    execute: Effect.fn("ReplyRewrite.detail")(function* (
-      input: ReplyRewriteDetailInput,
-      emit: (record: ReplyRewriteRecord | null) => Effect.Effect<void>,
-    ) {
-      const readDetail = requestGuarded(REPLY_REWRITE_WS_METHODS.getDetail, input.target);
-      let record = yield* readDetail;
-      for (let read = 1; replyRewriteIsActive(record) && read < 60; read++) {
-        yield* emit(record);
-        yield* Effect.sleep("2 seconds");
-        record = yield* readDetail;
-      }
-      return record;
-    }),
+    execute: Effect.fn("ReplyRewrite.detail")((input: ReplyRewriteDetailInput) =>
+      requestGuarded(REPLY_REWRITE_WS_METHODS.getDetail, input.target),
+    ),
   });
   const refresh = (
     target: { readonly environmentId: EnvironmentId; readonly input: ReplyRewriteDetailInput },
