@@ -7,9 +7,12 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
+import * as Logger from "effect/Logger";
 import * as Path from "effect/Path";
+import * as PlatformError from "effect/PlatformError";
 import * as Queue from "effect/Queue";
 import * as Sink from "effect/Sink";
+import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -58,7 +61,8 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
     readonly omitReady?: boolean;
     readonly holdSpawn?: boolean;
     readonly holdPreparation?: boolean;
-    readonly holdCleanup?: boolean;
+    readonly holdCleanup?: "directory" | "process";
+    readonly failCleanupCheck?: boolean;
   } = {},
 ) {
   const stdout = yield* Queue.unbounded<Uint8Array, Cause.Done>();
@@ -68,6 +72,7 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
   const emitted = yield* Deferred.make<void>();
   const cleanupStarted = yield* Deferred.make<void>();
   const releaseCleanup = yield* Deferred.make<void>();
+  let cleanupCheckFailures = 0;
   const directories: string[] = [];
   const fs = yield* FileSystem.FileSystem;
   const settings: string[] = [];
@@ -147,11 +152,21 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
         yield* fs.readFileString(command.args[command.args.indexOf("--system-prompt") + 1]!),
       );
       if (!options.omitReady) yield* emit({ type: "t3_reply_rewrite", kind: "ready", version: 1 });
+      let running = true;
+      yield* Effect.addFinalizer(() =>
+        Effect.gen(function* () {
+          if (options.holdCleanup === "process") {
+            yield* Deferred.succeed(cleanupStarted, undefined);
+            yield* Deferred.await(releaseCleanup);
+          }
+          running = false;
+        }),
+      );
       return ChildProcessSpawner.makeHandle({
         // Outside the valid pid range so teardown cannot signal a real process.
         pid: ChildProcessSpawner.ProcessId(999_999_999),
         exitCode: Effect.never,
-        isRunning: Effect.succeed(true),
+        isRunning: Effect.sync(() => running),
         kill: () => Effect.void,
         unref: Effect.succeed(Effect.void),
         stdin: Sink.forEach(onStdin),
@@ -173,11 +188,27 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
     }),
     Effect.provideService(FileSystem.FileSystem, {
       ...fs,
+      exists: (filePath) =>
+        Effect.gen(function* () {
+          if (
+            options.failCleanupCheck &&
+            filePath === directories[0] &&
+            cleanupCheckFailures === 0
+          ) {
+            cleanupCheckFailures++;
+            return yield* PlatformError.systemError({
+              _tag: "PermissionDenied",
+              module: "FileSystem",
+              method: "exists",
+            });
+          }
+          return yield* fs.exists(filePath);
+        }),
       makeTempDirectoryScoped: (tempOptions) =>
         Effect.gen(function* () {
           const directory = yield* fs.makeTempDirectoryScoped(tempOptions);
           directories.push(directory);
-          if (options.holdCleanup)
+          if (options.holdCleanup === "directory")
             yield* Effect.addFinalizer(() =>
               Deferred.succeed(cleanupStarted, undefined).pipe(
                 Effect.andThen(Deferred.await(releaseCleanup)),
@@ -441,6 +472,7 @@ it.effect.each(["set_model", "set_thinking_level", "get_state", "prompt"])(
       yield* TestClock.adjust(input.timeoutMs);
       const error = yield* Fiber.join(fiber);
       assert.equal(error.code, "timeout");
+      yield* pi.runner.awaitIdle;
       const fs = yield* FileSystem.FileSystem;
       assert.isFalse(yield* fs.exists(String(pi.commands[0]!.options.cwd)));
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
@@ -460,6 +492,7 @@ it.effect("does not treat agent_end as settlement and preserves cancellation", (
     yield* Fiber.interrupt(fiber);
     const exit = yield* Fiber.await(fiber);
     assert.isTrue(Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause));
+    yield* pi.runner.awaitIdle;
     const fs = yield* FileSystem.FileSystem;
     assert.isFalse(yield* fs.exists(String(pi.commands[0]!.options.cwd)));
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
@@ -504,21 +537,175 @@ it.effect.each([
     yield* TestClock.adjust(input.timeoutMs);
     assert.equal((yield* Fiber.join(fiber)).code, "timeout");
     assert.isEmpty(pi.received);
+    yield* pi.runner.awaitIdle;
     const fs = yield* FileSystem.FileSystem;
     assert.isFalse(yield* fs.exists(pi.directories[0]!));
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-it.effect("keeps the total deadline active during resource cleanup", () =>
+it.effect.each(["directory", "process"] as const)(
+  "returns at the total deadline while uninterruptible %s cleanup remains owned",
+  (holdCleanup) =>
+    Effect.gen(function* () {
+      const pi = yield* makeFakePi({ holdCleanup });
+      const finished = yield* Deferred.make<void>();
+      const fiber = yield* pi.runner.run(input).pipe(
+        Effect.onExit(() => Deferred.succeed(finished, undefined)),
+        Effect.flip,
+        Effect.forkChild,
+      );
+      yield* Deferred.await(pi.cleanupStarted);
+      yield* TestClock.adjust(input.timeoutMs);
+      const returned = yield* Deferred.isDone(finished);
+      yield* Effect.gen(function* () {
+        assert.isTrue(returned);
+        const error = yield* Fiber.join(fiber);
+        assert.equal(error.code, "timeout");
+        assert.isTrue(error.cleanupPending);
+        assert.include(error.message, "cleanup is still pending");
+        const state = yield* pi.runner.getState;
+        assert.equal(state.active?.requestId, "rewrite-1");
+        assert.equal(state.active?.phase, "cleanup");
+        assert.equal(state.active?.directory, pi.directories[0]);
+        assert.deepEqual(state.active?.pids, [999_999_999]);
+        const rejected = yield* pi.runner
+          .run({ ...input, requestId: "rewrite-2" })
+          .pipe(Effect.flip);
+        assert.equal(rejected.code, "configuration");
+        assert.isTrue(rejected.cleanupPending);
+        assert.lengthOf(pi.commands, 1);
+        const fs = yield* FileSystem.FileSystem;
+        assert.isTrue(yield* fs.exists(pi.directories[0]!));
+      }).pipe(Effect.ensuring(Deferred.succeed(pi.releaseCleanup, undefined)));
+      yield* pi.runner.awaitIdle;
+      assert.isNull((yield* pi.runner.getState).active);
+      const fs = yield* FileSystem.FileSystem;
+      assert.isFalse(yield* fs.exists(pi.directories[0]!));
+      const result = yield* pi.runner.run({ ...input, requestId: "rewrite-2" });
+      assert.equal(result.text, " 改写\n完整 ");
+      assert.lengthOf(pi.commands, 2);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "rejects concurrent work and preserves cancellation without joining pending cleanup",
+  () =>
+    Effect.gen(function* () {
+      const pi = yield* makeFakePi({ holdCommand: "prompt", holdCleanup: "process" });
+      const fiber = yield* pi.runner.run(input).pipe(Effect.forkChild);
+      yield* Deferred.await(pi.held);
+      const busy = yield* pi.runner.run({ ...input, requestId: "concurrent" }).pipe(Effect.flip);
+      assert.equal(busy.code, "configuration");
+      assert.isFalse(busy.cleanupPending);
+      assert.include(busy.message, "active request");
+      const cancelled = yield* Deferred.make<void>();
+      const cancelling = yield* Fiber.interrupt(fiber).pipe(
+        Effect.onExit(() => Deferred.succeed(cancelled, undefined)),
+        Effect.forkChild,
+      );
+      yield* Deferred.await(pi.cleanupStarted);
+      yield* TestClock.adjust(1_000);
+      yield* Effect.gen(function* () {
+        assert.isTrue(yield* Deferred.isDone(cancelled));
+        yield* Fiber.join(cancelling);
+        const exit = yield* Fiber.await(fiber);
+        assert.isTrue(Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause));
+        const state = yield* pi.runner.getState;
+        assert.equal(state.active?.phase, "cleanup");
+        const blocked = yield* pi.runner
+          .run({ ...input, requestId: "after-cancel" })
+          .pipe(Effect.flip);
+        assert.isTrue(blocked.cleanupPending);
+        assert.lengthOf(pi.commands, 1);
+      }).pipe(Effect.ensuring(Deferred.succeed(pi.releaseCleanup, undefined)));
+      yield* pi.runner.awaitIdle;
+      assert.isNull((yield* pi.runner.getState).active);
+      assert.equal(pi.received.filter((record) => record["type"] === "prompt").length, 1);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("bounds service scope shutdown and retains ownership until cleanup finishes", () =>
   Effect.gen(function* () {
-    const pi = yield* makeFakePi({ holdCleanup: true });
-    const fiber = yield* pi.runner.run(input).pipe(Effect.flip, Effect.forkChild);
+    const logs: unknown[] = [];
+    const logger = Logger.make(({ message }) => {
+      logs.push(message);
+    });
+    const owner = yield* Scope.make();
+    const pi = yield* makeFakePi({ holdCleanup: "process" }).pipe(
+      Effect.provideService(Scope.Scope, owner),
+      Effect.provide(Logger.layer([logger])),
+    );
+    const request = yield* pi.runner.run(input).pipe(Effect.flip, Effect.forkChild);
     yield* Deferred.await(pi.cleanupStarted);
-    yield* TestClock.adjust(input.timeoutMs);
-    yield* Deferred.succeed(pi.releaseCleanup, undefined);
-    assert.equal((yield* Fiber.join(fiber)).code, "timeout");
+    const shutdownFinished = yield* Deferred.make<void>();
+    const closing = yield* Scope.close(owner, Exit.void).pipe(
+      Effect.onExit(() => Deferred.succeed(shutdownFinished, undefined)),
+      Effect.forkChild,
+    );
+    const stopped = yield* Fiber.join(request);
+    assert.equal(stopped.code, "configuration");
+    assert.isTrue(stopped.cleanupPending);
+    yield* TestClock.adjust(1_000);
+    yield* Effect.gen(function* () {
+      assert.isTrue(yield* Deferred.isDone(shutdownFinished));
+      yield* Fiber.join(closing);
+      const state = yield* pi.runner.getState;
+      assert.isTrue(state.closed);
+      assert.equal(state.active?.requestId, "rewrite-1");
+      assert.deepEqual(state.active?.pids, [999_999_999]);
+      assert.deepEqual(logs, [
+        ["Pi reply rewrite runner closed with unreleased resources", state.active],
+      ]);
+      const rejected = yield* pi.runner.run(input).pipe(Effect.flip);
+      assert.include(rejected.message, "closed");
+      assert.lengthOf(pi.commands, 1);
+    }).pipe(Effect.ensuring(Deferred.succeed(pi.releaseCleanup, undefined)));
+    yield* pi.runner.awaitIdle;
+    assert.deepEqual(yield* pi.runner.shutdown(), { closed: true, active: null });
     const fs = yield* FileSystem.FileSystem;
     assert.isFalse(yield* fs.exists(pi.directories[0]!));
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("stops an active request before prompting and permanently closes admission", () =>
+  Effect.gen(function* () {
+    const pi = yield* makeFakePi({ holdCommand: "set_model" });
+    const request = yield* pi.runner.run(input).pipe(Effect.flip, Effect.forkChild);
+    yield* Deferred.await(pi.held);
+    assert.deepEqual(yield* pi.runner.shutdown(), { closed: true, active: null });
+    assert.equal((yield* Fiber.join(request)).code, "configuration");
+    const rejected = yield* pi.runner.run(input).pipe(Effect.flip);
+    assert.include(rejected.message, "closed");
+    assert.lengthOf(pi.commands, 1);
+    assert.deepEqual(
+      pi.received.map((record) => record["type"]),
+      ["set_model"],
+    );
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("retains failed cleanup and retries resources without repeating the prompt", () =>
+  Effect.gen(function* () {
+    const pi = yield* makeFakePi({ failCleanupCheck: true });
+    const cleanupLogged = yield* Deferred.make<void>();
+    const logger = Logger.make(({ message }) => {
+      if (Array.isArray(message) && message[0] === "Pi reply rewrite cleanup remains pending")
+        Deferred.doneUnsafe(cleanupLogged, Effect.void);
+    });
+    const fiber = yield* pi.runner
+      .run(input)
+      .pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])), Effect.forkChild);
+    yield* Deferred.await(cleanupLogged);
+    const state = yield* pi.runner.getState;
+    assert.equal(state.active?.phase, "cleanup_failed");
+    const blocked = yield* pi.runner.run({ ...input, requestId: "blocked" }).pipe(Effect.flip);
+    assert.isTrue(blocked.cleanupPending);
+    assert.lengthOf(pi.commands, 1);
+    yield* TestClock.adjust(1_000);
+    const result = yield* Fiber.join(fiber);
+    assert.equal(result.text, " 改写\n完整 ");
+    assert.isNull((yield* pi.runner.getState).active);
+    assert.equal(pi.received.filter((record) => record["type"] === "prompt").length, 1);
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
@@ -729,6 +916,8 @@ it.live.each(["cancel", "timeout"])("cleans a real subprocess tree on %s", (acti
         assert.equal(error.code, "timeout");
       }
     }
+    yield* fixture.runner.awaitIdle;
+    assert.isNull((yield* fixture.runner.getState).active);
     assert.throws(() => process.kill(pids.parentPid, 0));
     assert.throws(() => process.kill(pids.childPid, 0));
     const fs = yield* FileSystem.FileSystem;
