@@ -7,7 +7,13 @@ import {
   type ReplyReadingResult,
 } from "@t3tools/client-runtime/state/reply-reading";
 import { replyRewriteIsActive } from "@t3tools/client-runtime/state/reply-rewrite";
-import { type ReplyRewriteTargetInput } from "@t3tools/contracts";
+import {
+  EnvironmentAuthorizationError,
+  ReplyRewriteError,
+  type ReplyRewriteTargetInput,
+} from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
+import * as Schema from "effect/Schema";
 import { AsyncResult } from "effect/reactivity";
 import { use, useEffect, useState, type ReactNode } from "react";
 import { t } from "~/i18n";
@@ -22,6 +28,8 @@ import { TimelineRowCtx, type TimelineRow } from "./timelineRowContext";
 
 type ReplyRow = Extract<TimelineRow, { kind: "message" | "assistant-meta" }>;
 type ReadingChildren = (reading: ReplyReadingResult, controls?: ReactNode) => ReactNode;
+const isAuthorizationError = Schema.is(EnvironmentAuthorizationError);
+const isRewriteError = Schema.is(ReplyRewriteError);
 
 export function ReplyRewriteResponse({
   row,
@@ -125,7 +133,10 @@ function ReplyRewriteReading({
   const preference = useAtomValue(preferenceAtom);
   const queryTarget = { environmentId, input: { target, sourceText, completionKey } };
   const detail = useAtomValue(replyRewriteEnvironment.detail(queryTarget));
-  const record = AsyncResult.getOrElse(detail, () => null);
+  const detailFailure = detail._tag === "Failure" ? Cause.squash(detail.cause) : null;
+  const record = isAuthorizationError(detailFailure)
+    ? null
+    : AsyncResult.getOrElse(detail, () => null);
   const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const allowed = useAtomValue(replyRewriteEnvironment.request.permissionAtom(environmentId));
   const cancelAllowed = useAtomValue(replyRewriteEnvironment.cancel.permissionAtom(environmentId));
@@ -138,6 +149,7 @@ function ReplyRewriteReading({
     sourceText,
     detail: { environmentId, sourceText, record },
     preference,
+    failure: isRewriteError(detailFailure) ? detailFailure : null,
   };
   const available = resolveReplyReading({ ...readingInput, preference: null });
   const citationRequest =

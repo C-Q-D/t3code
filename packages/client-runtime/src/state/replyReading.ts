@@ -3,6 +3,7 @@ import type {
   AssistantCitation,
   EnvironmentId,
   ReplyRewriteRecord,
+  ReplyRewriteFailure,
   ReplyRewriteTargetInput,
 } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
@@ -32,6 +33,7 @@ export interface ReplyReadingInput {
     readonly record: ReplyRewriteRecord | null;
   } | null;
   readonly preference: ReplyReadingPreference;
+  readonly failure?: ReplyRewriteFailure | null;
 }
 
 export interface ReplyReadingResult {
@@ -45,6 +47,11 @@ export function resolveReplyReading(input: ReplyReadingInput): ReplyReadingResul
   const detail = input.detail;
   const record = detail?.record;
   const success = record?.lastSuccess;
+  const failure = input.failure ?? record?.currentAttempt?.error;
+  const sourceUnavailable =
+    failure?.code === "source_changed" ||
+    failure?.code === "not_found" ||
+    failure?.code === "not_eligible";
   const matchesTarget = (target: ReplyRewriteTargetInput) =>
     target.threadId === input.identity.threadId &&
     target.runId === input.identity.runId &&
@@ -55,6 +62,7 @@ export function resolveReplyReading(input: ReplyReadingInput): ReplyReadingResul
     detail.sourceText !== input.sourceText ||
     !record ||
     !success ||
+    sourceUnavailable ||
     !matchesTarget(record.target) ||
     !matchesTarget(success.target) ||
     success.target.sourceHash !== record.target.sourceHash

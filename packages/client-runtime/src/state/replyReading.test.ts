@@ -103,6 +103,24 @@ describe("reply reading", () => {
         record: { ...record, target: { ...target, sourceHash: "c".repeat(64) } },
       },
     },
+    {
+      ...input,
+      detail: {
+        ...input.detail,
+        record: {
+          ...record,
+          currentAttempt: {
+            ...success,
+            generation: 2,
+            status: "failed" as const,
+            requestedAt: success.completedAt,
+            startedAt: null,
+            finishedAt: success.completedAt,
+            error: { code: "source_changed" as const, message: "Source changed" },
+          },
+        },
+      },
+    },
   ])("revokes a rewrite after source or target changes", (changed) => {
     expect(resolveReplyReading(changed)).toEqual({
       text: changed.sourceText,
