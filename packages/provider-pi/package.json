@@ -18,6 +18,10 @@
     "./server/usage": {
       "types": "./src/server/usage.ts",
       "import": "./src/server/usage.ts"
+    },
+    "./server/replyRewrite": {
+      "types": "./src/server/replyRewrite.ts",
+      "import": "./src/server/replyRewrite.ts"
     }
   },
   "scripts": {
