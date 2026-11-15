@@ -143,8 +143,7 @@ function readObservation(event: PiRpcRecord) {
     event["type"] !== "extension_ui_request" ||
     event["method"] !== "notify" ||
     event["notifyType"] !== "info" ||
-    typeof message !== "string" ||
-    message.length > 4_096
+    typeof message !== "string"
   )
     return undefined;
   const json = decodeNotificationJson(message);
@@ -154,6 +153,7 @@ function readObservation(event: PiRpcRecord) {
     piRecordNumber(json.value, "version") !== 1
   )
     return undefined;
+  if (message.length > 4_096) return false;
   const observation = decodeObservation(json.value);
   return Option.isSome(observation) ? observation.value : false;
 }

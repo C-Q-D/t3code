@@ -426,6 +426,18 @@ it.effect.each([
     code: "protocol",
   },
   {
+    name: "oversized observation with extra field",
+    event: notification({
+      kind: "response",
+      status: "response.completed",
+      model: null,
+      actualServiceTier: null,
+      usage: null,
+      extra: "x".repeat(4_096),
+    }),
+    code: "protocol",
+  },
+  {
     name: "unknown observation kind",
     event: notification({ kind: "other" }),
     code: "protocol",
