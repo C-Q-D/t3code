@@ -708,9 +708,15 @@ it.effect(
     }),
 );
 
-it.effect.each(["classification", "run"] as const)(
-  "versions restored identical bytes after source %s invalidation",
-  (invalidation) =>
+it.effect.each([
+  { invalidation: "classification", cancelFirst: false },
+  { invalidation: "run", cancelFirst: false },
+  { invalidation: "classification", cancelFirst: true },
+  { invalidation: "run", cancelFirst: true },
+  { invalidation: "text", cancelFirst: true },
+] as const)(
+  "versions restored identical bytes after $invalidation invalidation, cancelled=$cancelFirst",
+  ({ invalidation, cancelFirst }) =>
     Effect.gen(function* () {
       const controlled = yield* makeControlledRunner;
       yield* Effect.gen(function* () {
@@ -723,6 +729,20 @@ it.effect.each(["classification", "run"] as const)(
           events: [fixture.event({ type: "message.updated", payload: fixture.message })],
         });
         const first = yield* service.getDetail(fixture.target);
+        if (cancelFirst) {
+          yield* service.cancel({ ...fixture.target, requestId: first!.currentAttempt!.requestId });
+          yield* fixture.sink.write({
+            events: [fixture.event({ type: "message.updated", payload: fixture.message })],
+          });
+          const unchanged = yield* service.getDetail(fixture.target);
+          assert.equal(unchanged?.currentAttempt?.requestId, first?.currentAttempt?.requestId);
+          assert.equal(unchanged?.currentAttempt?.status, "cancelled");
+          assert.equal(yield* (yield* Worker.ReplyRewriteWorker).drain, 0);
+        }
+        if (invalidation === "text")
+          yield* (yield* Settings.ServerSettingsService).updateSettings({
+            replyRewrite: { auto: false },
+          });
         yield* fixture.sink.write({
           events: [
             invalidation === "classification"
@@ -733,16 +753,25 @@ it.effect.each(["classification", "run"] as const)(
                     replyClassification: { kind: "commentary", source: "codex_phase" },
                   },
                 })
-              : fixture.event({
-                  type: "run.updated",
-                  payload: { ...fixture.run, status: "rolled_back" },
-                }),
+              : invalidation === "text"
+                ? fixture.event({
+                    type: "message.updated",
+                    payload: { ...fixture.message, text: "B" },
+                  })
+                : fixture.event({
+                    type: "run.updated",
+                    payload: { ...fixture.run, status: "rolled_back" },
+                  }),
           ],
         });
         assert.isNull(yield* service.getDetail(fixture.target));
+        if (invalidation === "text")
+          yield* (yield* Settings.ServerSettingsService).updateSettings({
+            replyRewrite: { auto: true },
+          });
         yield* fixture.sink.write({
           events: [
-            invalidation === "classification"
+            invalidation !== "run"
               ? fixture.event({ type: "message.updated", payload: fixture.message })
               : fixture.event({ type: "run.updated", payload: fixture.run }),
           ],

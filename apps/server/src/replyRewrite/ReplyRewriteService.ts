@@ -358,7 +358,9 @@ const make = Effect.gen(function* () {
         const original = yield* source(record.target);
         if (
           (original === null || original.sourceHash !== record.target.sourceHash) &&
-          (record.lastSuccess !== null || record.currentAttempt?.status !== "cancelled")
+          (record.lastSuccess !== null ||
+            record.currentAttempt?.status !== "cancelled" ||
+            record.currentAttempt.error?.code !== "source_changed")
         )
           yield* invalidate(record);
       }
