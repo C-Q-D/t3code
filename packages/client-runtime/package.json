@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./state/reply-reading": {
+      "types": "./src/state/replyReading.ts",
+      "default": "./src/state/replyReading.ts"
+    },
     "./state/reply-rewrite": {
       "types": "./src/state/replyRewrite.ts",
       "default": "./src/state/replyRewrite.ts"
