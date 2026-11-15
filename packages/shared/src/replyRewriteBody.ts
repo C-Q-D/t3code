@@ -8,16 +8,28 @@ const MAX_BODY_LENGTH = 512_000;
 
 function protectedValues(text: string): string[] {
   const values: string[] = [];
+  const tree = parser.parse(text);
+  const definitions = new Map<string, string>();
+  const collectDefinitions = (node: Root | RootContent): void => {
+    if (node.type === "definition" && !definitions.has(node.identifier))
+      definitions.set(node.identifier, node.url);
+    if ("children" in node) node.children.forEach(collectDefinitions);
+  };
+  collectDefinitions(tree);
   const visit = (node: Root | RootContent): void => {
     if (node.type === "code")
       values.push(JSON.stringify(["code", node.lang, node.meta, node.value]));
     if (node.type === "inlineCode") values.push(JSON.stringify(["inlineCode", node.value]));
-    if (node.type === "link" || node.type === "image" || node.type === "definition") {
+    if (node.type === "link" || node.type === "image") {
       values.push(JSON.stringify(["destination", node.url]));
+    }
+    if (node.type === "linkReference" || node.type === "imageReference") {
+      const destination = definitions.get(node.identifier);
+      if (destination !== undefined) values.push(JSON.stringify(["destination", destination]));
     }
     if ("children" in node) node.children.forEach(visit);
   };
-  visit(parser.parse(text));
+  visit(tree);
   return values.sort();
 }
 
