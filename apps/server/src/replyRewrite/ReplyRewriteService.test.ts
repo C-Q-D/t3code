@@ -93,6 +93,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
     classification?: OrchestrationV2ConversationMessage["replyClassification"];
     child?: boolean;
     sideChat?: boolean;
+    driver?: string;
   } = {},
 ) {
   const now = yield* DateTime.now;
@@ -149,7 +150,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
   const providerThread: OrchestrationV2ProviderThread = {
     id: providerThreadId,
     appThreadId: threadId,
-    driver: ProviderDriverKind.make("codex"),
+    driver: ProviderDriverKind.make(options.driver ?? "codex"),
     providerInstanceId: instanceId,
     providerSessionId: null,
     ownerNodeId: null,
@@ -249,6 +250,9 @@ it.effect(
         assert.equal(call.input.sourceText, "Source reply.\r\nSecond line.");
         assert.isFalse(call.input.systemPrompt.includes("Future style"));
         assert.equal(call.input.requestedServiceTier, "priority");
+        assert.equal(call.input.provider, "openai-codex");
+        assert.equal(call.input.modelId, "gpt-6.1-terra");
+        assert.equal(call.input.thinkingLevel, "max");
         yield* Deferred.succeed(call.result, output());
         yield* Fiber.join(job);
         const saved = yield* service.request(request);
@@ -549,6 +553,7 @@ it.effect.each([
   { child: true, sideChat: false, status: "completed" as const },
   { child: false, sideChat: true, status: "completed" as const },
   { child: false, sideChat: false, status: "failed" as const },
+  { driver: "claudeCode", status: "completed" as const },
 ])("excludes non-user-success sources: %j", (options) =>
   Effect.gen(function* () {
     const controlled = yield* makeControlledRunner;
@@ -809,6 +814,105 @@ it.effect(
         assert.isTrue(Option.isNone(yield* outbox.claimNext({ workerId: "no-main-work" })));
       }).pipe(Effect.provide(testLayer(controlled.runner)));
     }),
+);
+
+it.effect.each([false, true])(
+  "passes editable non-default configuration to the runner with an acceptance snapshot (auto: %s)",
+  (automatic) =>
+    Effect.gen(function* () {
+      const controlled = yield* makeControlledRunner;
+      yield* Effect.gen(function* () {
+        const fixture = yield* seed({ classification: { kind: "final", source: "codex_phase" } });
+        const settings = yield* Settings.ServerSettingsService;
+        const config = {
+          binaryPath: "alternate-pi",
+          provider: "openai",
+          modelId: "supported-model",
+          thinkingLevel: "medium",
+          requestedServiceTier: "default" as const,
+          customPrompt: "Keep it clear.",
+        };
+        yield* settings.updateSettings({ replyRewrite: { ...config, auto: automatic } });
+        const service = yield* Service.ReplyRewriteService;
+        if (automatic)
+          yield* fixture.sink.write({
+            events: [fixture.event({ type: "message.updated", payload: fixture.message })],
+          });
+        else yield* service.request({ ...fixture.target, requestId: "non-default" });
+        const accepted = yield* service.getDetail(fixture.target);
+        assert.equal(accepted?.currentAttempt?.status, "queued");
+        assert.deepEqual(accepted?.currentAttempt?.configSnapshot, config);
+        yield* settings.updateSettings({
+          replyRewrite: { modelId: "future-model", customPrompt: "Future style." },
+        });
+        const job = yield* (yield* Worker.ReplyRewriteWorker).runOnce.pipe(Effect.forkScoped);
+        const call = yield* Queue.take(controlled.calls);
+        assert.deepEqual(
+          {
+            binaryPath: call.input.binaryPath,
+            provider: call.input.provider,
+            modelId: call.input.modelId,
+            thinkingLevel: call.input.thinkingLevel,
+            requestedServiceTier: call.input.requestedServiceTier,
+          },
+          {
+            binaryPath: "alternate-pi",
+            provider: "openai",
+            modelId: "supported-model",
+            thinkingLevel: "medium",
+            requestedServiceTier: "default",
+          },
+        );
+        assert.isTrue(call.input.systemPrompt.includes("Keep it clear."));
+        assert.isFalse(call.input.systemPrompt.includes("Future style."));
+        yield* Deferred.succeed(call.result, {
+          ...output(),
+          model: "supported-model",
+          requestedServiceTier: "default" as const,
+        });
+        yield* Fiber.join(job);
+        assert.equal(
+          (yield* service.getDetail(fixture.target))?.lastSuccess?.model,
+          "supported-model",
+        );
+      }).pipe(Effect.provide(testLayer(controlled.runner)));
+    }),
+);
+
+it.effect("records unsupported runner configuration without retrying or reverting the source", () =>
+  Effect.gen(function* () {
+    const controlled = yield* makeControlledRunner;
+    yield* Effect.gen(function* () {
+      const fixture = yield* seed();
+      yield* (yield* Settings.ServerSettingsService).updateSettings({
+        replyRewrite: { modelId: "unavailable-model" },
+      });
+      const service = yield* Service.ReplyRewriteService;
+      yield* service.request({ ...fixture.target, requestId: "unsupported-config" });
+      const worker = yield* Worker.ReplyRewriteWorker;
+      const job = yield* worker.runOnce.pipe(Effect.forkScoped);
+      const call = yield* Queue.take(controlled.calls);
+      assert.equal(call.input.modelId, "unavailable-model");
+      yield* Deferred.fail(
+        call.result,
+        new ReplyRewriteError({
+          code: "configuration",
+          message: "Model is unavailable in this runner.",
+        }),
+      );
+      yield* Fiber.join(job);
+      const failed = yield* service.getDetail(fixture.target);
+      assert.equal(failed?.currentAttempt?.status, "failed");
+      assert.equal(failed?.currentAttempt?.error?.code, "configuration");
+      assert.equal(yield* worker.drain, 0);
+      assert.equal(
+        (yield* (yield* ProjectionStore.ProjectionStoreV2).getThreadProjection(
+          fixture.target.threadId,
+        )).messages.find((message) => message.id === fixture.message.id)?.text,
+        fixture.message.text,
+      );
+    }).pipe(Effect.provide(testLayer(controlled.runner)));
+  }),
 );
 
 it.effect(

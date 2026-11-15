@@ -52,11 +52,6 @@ type RewriteRow = {
 type ChangeRow = { revision: number; thread_id: string; run_id: string; message_id: string };
 const hash = (text: string) => NodeCrypto.createHash("sha256").update(text, "utf8").digest("hex");
 const isReplyRewriteError = Schema.is(ReplyRewriteError);
-const supportedConfig = (config: ReplyRewriteSettings) =>
-  config.provider === "openai-codex" &&
-  config.modelId === "gpt-6.1-terra" &&
-  config.thinkingLevel === "max" &&
-  config.requestedServiceTier === "priority";
 const jobId = (requestId: string) => `reply-rewrite:${hash(requestId)}`;
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 const encodeAttempt = Schema.encodeSync(Schema.fromJsonString(ReplyRewriteAttempt));
@@ -254,13 +249,6 @@ const make = Effect.gen(function* () {
         code: "configuration",
         message: "The Pi reply rewrite runner is not connected.",
       });
-    if (!supportedConfig(config)) {
-      return yield* new ReplyRewriteError({
-        code: "configuration",
-        message:
-          "Reply rewriting requires openai-codex/gpt-6.1-terra, max thinking and priority service.",
-      });
-    }
     const { auto: _auto, ...configSnapshot } = config;
     const effectiveConfig = {
       ...configSnapshot,
@@ -389,7 +377,7 @@ const make = Effect.gen(function* () {
       ];
       if (completedRuns.length === 0) return;
       const config = (yield* settings.getSettings).replyRewrite;
-      if (!config.auto || Option.isNone(runner) || !supportedConfig(config)) return;
+      if (!config.auto || Option.isNone(runner)) return;
       for (const run of completedRuns) {
         const messages = yield* sql<{
           message_id: string;
