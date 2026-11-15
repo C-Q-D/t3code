@@ -4,7 +4,9 @@ import {
   type ReplyRewriteUsage,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
-import type * as Effect from "effect/Effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import { makePiReplyRewriteRunner } from "@t3tools/provider-pi/server/replyRewrite";
 
 /** The Pi adapter supplies this port. The server never substitutes a conversation provider. */
 export class ReplyRewriteRunner extends Context.Service<
@@ -32,3 +34,22 @@ export class ReplyRewriteRunner extends Context.Service<
     >;
   }
 >()("t3/replyRewrite/ReplyRewriteRunner") {}
+
+const makePi = Effect.gen(function* () {
+  const runner = yield* makePiReplyRewriteRunner();
+  return ReplyRewriteRunner.of({
+    run: Effect.fn("ReplyRewriteRunner.run")((input) =>
+      runner.run(input).pipe(
+        Effect.mapError(
+          (error) =>
+            new ReplyRewriteError({
+              code: error.code,
+              message: error.message,
+            }),
+        ),
+      ),
+    ),
+  });
+});
+
+export const layerPi = Layer.effect(ReplyRewriteRunner, makePi);

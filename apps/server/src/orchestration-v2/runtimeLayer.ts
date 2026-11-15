@@ -27,6 +27,7 @@ import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as ReplyRewriteService from "../replyRewrite/ReplyRewriteService.ts";
+import * as ReplyRewriteRunner from "../replyRewrite/ReplyRewriteRunner.ts";
 import * as ReplyRewriteWorker from "../replyRewrite/ReplyRewriteWorker.ts";
 import * as EffectWorker from "./EffectWorker.ts";
 import * as EventSink from "./EventSink.ts";
@@ -87,7 +88,9 @@ const layerStores = Layer.mergeAll(
   TurnItemPositionStore.layer,
 );
 
-const layerReplyRewrites = ReplyRewriteService.layer.pipe(Layer.provide(EffectOutbox.layer));
+const layerReplyRewrites = ReplyRewriteService.layer.pipe(
+  Layer.provide(Layer.merge(EffectOutbox.layer, ReplyRewriteRunner.layerPi)),
+);
 const layerReplyRewriteWorker = ReplyRewriteWorker.layer.pipe(
   Layer.provide(Layer.merge(layerReplyRewrites, EffectOutbox.layer)),
 );
