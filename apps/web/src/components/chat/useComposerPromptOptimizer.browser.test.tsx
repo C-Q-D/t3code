@@ -120,7 +120,11 @@ function Harness({
           Improve prompt
         </button>
       ) : null}
-      <ComposerAssistPopover optimizer={optimizer} shortcut="Ctrl+Shift+U" rewrite={rewrite} />
+      <ComposerAssistPopover
+        optimizer={optimizer}
+        shortcut="Ctrl+Shift+U"
+        {...(rewrite === undefined ? {} : { rewrite })}
+      />
       <ComposerPromptEditor
         editorRef={editorRef}
         value={prompt}
