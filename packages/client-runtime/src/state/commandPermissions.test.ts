@@ -16,6 +16,7 @@ import {
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
   REPLY_REWRITE_WS_METHODS,
+  MessageId,
   ThreadId,
   RunId,
   DiscussionId,
@@ -40,6 +41,7 @@ import { createCommandPermissions } from "./commandPermissions.ts";
 import { createEnvironmentRpcCommand } from "./runtime.ts";
 import { createServerEnvironmentAtoms } from "./server.ts";
 import { createComposerAssistEnvironmentAtoms } from "./composerAssist.ts";
+import { createReplyRewriteEnvironmentAtoms } from "./replyRewrite.ts";
 import { EnvironmentCacheStore } from "../platform/persistence.ts";
 import { AVAILABLE_CONNECTION_STATE } from "../connection/model.ts";
 import { createPeerLinkEnvironmentAtoms } from "./peerLinks.ts";
@@ -309,6 +311,71 @@ describe("discussion command permissions", () => {
 });
 
 describe("command permissions", () => {
+  it.effect("loads rewrite detail using the destination read grant without requiring operate", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const registry = yield* setup;
+        registry.set(
+          sessions(env),
+          AsyncResult.success({
+            ...grant(false),
+            scopes: [AuthOrchestrationReadScope],
+            permissions: [AuthOrchestrationReadScope],
+          }),
+        );
+        let reads = 0;
+        const supervisor = {
+          target: { environmentId: env, label: "test" },
+          state: yield* SubscriptionRef.make({ ...AVAILABLE_CONNECTION_STATE, phase: "connected" }),
+          session: yield* SubscriptionRef.make(
+            Option.some({
+              client: {
+                [REPLY_REWRITE_WS_METHODS.getDetail]: () =>
+                  Effect.sync(() => {
+                    reads++;
+                    return null;
+                  }),
+              },
+            } as unknown as RpcSession),
+          ),
+        } as unknown as EnvironmentSupervisor["Service"];
+        const queryRuntime = Atom.runtime(
+          Layer.succeed(EnvironmentRegistry, {
+            run: (_id: EnvironmentId, effect: Effect.Effect<unknown>) =>
+              Effect.provideService(effect, EnvironmentSupervisor, supervisor),
+            followStream: (_id: EnvironmentId, stream: Stream.Stream<unknown>) =>
+              Stream.provideService(stream, EnvironmentSupervisor, supervisor),
+          } as unknown as EnvironmentRegistry["Service"]),
+        );
+        const atoms = createReplyRewriteEnvironmentAtoms(queryRuntime);
+        const atom = atoms.detail({
+          environmentId: env,
+          input: {
+            target: {
+              threadId: ThreadId.make("thread"),
+              runId: RunId.make("run"),
+              messageId: MessageId.make("message"),
+            },
+            sourceText: "Canonical text",
+          },
+        });
+        registry.mount(atom);
+        const detail = yield* AtomRegistry.getResult(registry, atom, { suspendOnWaiting: true });
+        expect(detail).toBeNull();
+        expect(reads).toBe(1);
+        registry.set(sessions(env), AsyncResult.success(grant(false)));
+        registry.refresh(atom);
+        const denied = yield* AtomRegistry.getResult(registry, atom, {
+          suspendOnWaiting: true,
+        }).pipe(Effect.flip);
+        expect(denied).toMatchObject({
+          _tag: "EnvironmentAuthorizationError",
+          requiredScope: AuthOrchestrationReadScope,
+        });
+        expect(reads).toBe(1);
+      }),
+    ),
+  );
   it.effect("requires the destination operate grant to export conversations", () =>
     Effect.scoped(
       Effect.gen(function* () {

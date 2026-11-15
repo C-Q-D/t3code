@@ -712,9 +712,17 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
               return Option.isSome(session)
                 ? runInEnvironment(
                     target.environmentId,
-                    options
-                      .execute(target.input, emit)
-                      .pipe(pendingOnceSessionReplaced(session.value)),
+                    options.execute(target.input, emit).pipe(
+                      pendingOnceSessionReplaced(session.value),
+                      Effect.provideService(RpcPermissionGuard, {
+                        authorize: (environmentId, method, payload) =>
+                          createCommandPermissions(runtime, method).authorize(
+                            get.registry,
+                            environmentId,
+                            payload,
+                          ),
+                      }),
+                    ),
                   )
                 : Effect.never;
             case "connecting":

@@ -97,6 +97,7 @@ function CodexReplyRewriteResponse({
       row={row}
       target={target}
       sourceText={sourceText}
+      completionKey={`${support.run?.status}:${support.providerTurn?.status}`}
     >
       {children}
     </ReplyRewriteReading>
@@ -107,11 +108,13 @@ function ReplyRewriteReading({
   row,
   target,
   sourceText,
+  completionKey,
   children,
 }: {
   row: ReplyRow;
   target: ReplyRewriteTargetInput;
   sourceText: string;
+  completionKey: string;
   children: ReadingChildren;
 }) {
   const ctx = use(TimelineRowCtx);
@@ -120,7 +123,7 @@ function ReplyRewriteReading({
   const identity = { environmentId, ...target };
   const preferenceAtom = replyReadingPreferenceAtom(identity);
   const preference = useAtomValue(preferenceAtom);
-  const queryTarget = { environmentId, input: { target, sourceText } };
+  const queryTarget = { environmentId, input: { target, sourceText, completionKey } };
   const detail = useAtomValue(replyRewriteEnvironment.detail(queryTarget));
   const record = AsyncResult.getOrElse(detail, () => null);
   const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
@@ -149,15 +152,16 @@ function ReplyRewriteReading({
   });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a citation navigation is external input that selects its saved display version
   useEffect(() => {
-    if (!citationRequest || detail.waiting || detail._tag === "Initial") return;
-    if (citationSource === "unavailable") {
+    if (!citationRequest) return;
+    if (citationSource === "unavailable" && !detail.waiting && detail._tag !== "Initial") {
       citationRequest.onComplete();
       toastManager.add({
         type: "warning",
         title: t.chat.replyRewrite.versionUnavailable,
         description: t.chat.replyRewrite.savedQuoteAvailable,
       });
-    } else if (citationSource) registry.set(preferenceAtom, citationSource);
+    } else if (citationSource === "original" || citationSource === "rewrite")
+      registry.set(preferenceAtom, citationSource);
   }, [citationRequest, citationSource, detail.waiting, detail._tag, registry, preferenceAtom]);
 
   const active = replyRewriteIsActive(record);

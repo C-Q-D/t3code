@@ -22,6 +22,7 @@ export function replyRewriteIsActive(record: ReplyRewriteRecord | null): boolean
 export interface ReplyRewriteDetailInput {
   readonly target: ReplyRewriteTargetInput;
   readonly sourceText: string;
+  readonly completionKey?: string;
 }
 
 /**
@@ -37,11 +38,12 @@ export function createReplyRewriteEnvironmentAtoms<R, E>(
       input: ReplyRewriteDetailInput,
       emit: (record: ReplyRewriteRecord | null) => Effect.Effect<void>,
     ) {
-      let record = yield* requestGuarded(REPLY_REWRITE_WS_METHODS.getDetail, input.target);
+      const readDetail = requestGuarded(REPLY_REWRITE_WS_METHODS.getDetail, input.target);
+      let record = yield* readDetail;
       for (let read = 1; replyRewriteIsActive(record) && read < 60; read++) {
         yield* emit(record);
         yield* Effect.sleep("2 seconds");
-        record = yield* requestGuarded(REPLY_REWRITE_WS_METHODS.getDetail, input.target);
+        record = yield* readDetail;
       }
       return record;
     }),
