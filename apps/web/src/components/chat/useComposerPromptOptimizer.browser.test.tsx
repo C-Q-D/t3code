@@ -154,6 +154,7 @@ it.each(["preparing", "queued", "starting"] as const)(
     const button = page.getByRole("button", { name: "立即优化", exact: true });
     await expect.element(button).toBeDisabled();
     await expect.element(page.getByText("等回复结束后再优化", { exact: true })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
     expect(fake.run).not.toHaveBeenCalled();
   },
@@ -316,6 +317,7 @@ it.each(["setting", "permission"] as const)(
     await expect
       .element(screen.getByRole("menuitem", { name: "Improve prompt" }))
       .not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
     await screen.getByRole("textbox").click();
     await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
@@ -520,10 +522,14 @@ it.each(["keyboard", "button"] as const)(
     await userEvent.keyboard("{Home}{ArrowRight}{ArrowRight}{ArrowRight}");
     await screen.getByRole("button", { name: /^Writing tools/ }).click();
     await page.getByRole("button", { name: "Improve now", exact: true }).click();
+    await userEvent.keyboard("{Escape}");
     await screen.getByRole("textbox").click();
-    await userEvent.keyboard(
-      "{Home}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}",
-    );
+    await userEvent.keyboard("{Home}");
+    await vi.waitFor(() => expect(window.getSelection()?.focusOffset).toBe(0));
+    for (let offset = 1; offset <= 8; offset++) {
+      await userEvent.keyboard("{ArrowRight}");
+      await vi.waitFor(() => expect(window.getSelection()?.focusOffset).toBe(offset));
+    }
     await act(() =>
       pending.resolve(
         AsyncResult.success({
@@ -585,6 +591,7 @@ it.each([20000, 20001])("checks the serialized draft length at %i characters", a
     await expect
       .element(screen.getByRole("menuitem", { name: "Improve prompt" }))
       .not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
     await screen.getByRole("textbox").click();
     await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
@@ -751,6 +758,7 @@ it.each([
     await expect.element(optimizeButton).toBeDisabled();
     (optimizeButton.element() as HTMLButtonElement).click();
     expect(fake.run).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
     await screen.getByRole("textbox").click();
     await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
     expect(fake.run).not.toHaveBeenCalled();
@@ -761,6 +769,7 @@ it.each([
     expect(fake.run).not.toHaveBeenCalled();
     await screen.getByRole("button", { name: tools }).click();
     await expect.element(page.getByText(hint, { exact: true })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
     await screen.getByRole("textbox").fill("");
     await screen.getByRole("button", { name: tools }).click();
     await expect.element(page.getByText(hint, { exact: true })).toBeVisible();
