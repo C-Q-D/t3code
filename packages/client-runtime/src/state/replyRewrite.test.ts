@@ -14,6 +14,7 @@ import {
   type ReplyRewriteRequestInput,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -79,6 +80,9 @@ const harness = Effect.fn("ReplyRewriteTest.harness")(function* () {
   const calls: string[] = [];
   let record: ReplyRewriteRecord | null = null;
   let acknowledged = false;
+  const started = yield* Deferred.make<void>();
+  const release = yield* Deferred.make<void>();
+  let hold = false;
   const supervisor = {
     target: { environmentId: env, label: "destination" },
     state: yield* SubscriptionRef.make({ ...AVAILABLE_CONNECTION_STATE, phase: "connected" }),
@@ -89,6 +93,12 @@ const harness = Effect.fn("ReplyRewriteTest.harness")(function* () {
           [REPLY_REWRITE_WS_METHODS.request]: (input: ReplyRewriteRequestInput) =>
             Effect.suspend(() => {
               calls.push(input.requestId);
+              if (hold && input.requestId === "A")
+                return Effect.gen(function* () {
+                  yield* Deferred.succeed(started, undefined);
+                  yield* Deferred.await(release);
+                  return completed(input.requestId, input.messageId);
+                });
               return acknowledged
                 ? Effect.succeed(completed(input.requestId, input.messageId))
                 : Effect.fail(
@@ -121,6 +131,22 @@ const harness = Effect.fn("ReplyRewriteTest.harness")(function* () {
     calls,
     runtime,
     detail,
+    started,
+    release,
+    hold: () => {
+      hold = true;
+    },
+    setOperate: (enabled: boolean) => {
+      const state = registry.get(sessions(env));
+      if (state._tag !== "Success") throw new Error("Missing test session");
+      const scopes = enabled
+        ? [AuthOrchestrationReadScope, AuthOrchestrationOperateScope]
+        : [AuthOrchestrationReadScope];
+      registry.set(
+        sessions(env),
+        AsyncResult.success({ ...state.value, scopes, permissions: scopes }),
+      );
+    },
     setRecord: (next: ReplyRewriteRecord | null) => {
       record = next;
     },
@@ -129,6 +155,54 @@ const harness = Effect.fn("ReplyRewriteTest.harness")(function* () {
     },
   };
 });
+
+it.effect("retains an unknown ID when its retransmission is denied", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const h = yield* harness();
+      const send = (requestId: string) =>
+        Effect.promise(() =>
+          h.atoms.request.run(h.registry, {
+            environmentId: env,
+            input: { ...target, requestId, sourceText: "Original text" },
+          }),
+        );
+      expect((yield* send("A"))._tag).toBe("Failure");
+      h.setOperate(false);
+      expect((yield* send("B"))._tag).toBe("Failure");
+      h.setOperate(true);
+      yield* send("C");
+      expect(h.calls).toEqual(["A", "A"]);
+    }),
+  ),
+);
+
+it.effect("sends a new generation after detail confirms an in-flight request", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const h = yield* harness();
+      h.hold();
+      h.acknowledge();
+      const send = (requestId: string) =>
+        h.atoms.request.run(h.registry, {
+          environmentId: env,
+          input: { ...target, requestId, sourceText: "Original text" },
+        });
+      const first = send("A");
+      yield* Deferred.await(h.started);
+      h.setRecord(completed("A"));
+      h.registry.mount(h.detail);
+      yield* AtomRegistry.getResult(h.registry, h.detail, { suspendOnWaiting: true });
+      const second = send("B");
+      yield* Deferred.succeed(h.release, undefined);
+      const result = yield* Effect.promise(() => second);
+      yield* Effect.promise(() => first);
+      expect(h.calls).toEqual(["A", "B"]);
+      expect(result._tag).toBe("Success");
+      if (result._tag === "Success") expect(result.value.lastSuccess?.requestId).toBe("B");
+    }),
+  ),
+);
 
 it.effect(
   "reuses an unconfirmed ID across remounts, then regenerates with a new ID after detail confirms it",

@@ -114,7 +114,8 @@ export function createReplyRewriteEnvironmentAtoms<R, E>(
     tag: REPLY_REWRITE_WS_METHODS.request,
     concurrency: {
       mode: "singleFlight",
-      key: ({ environmentId, input }) => submissionKey(environmentId, input),
+      key: ({ environmentId, input }) =>
+        JSON.stringify([submissionKey(environmentId, input), input.requestId]),
     },
   });
   return {
@@ -158,7 +159,11 @@ export function createReplyRewriteEnvironmentAtoms<R, E>(
           environmentId: target.environmentId,
           input: { ...input, requestId },
         });
-        if (result._tag === "Success" || isAcknowledgedError(Cause.squash(result.cause)))
+        // Rejection of a retransmission cannot settle the earlier unknown attempt.
+        if (
+          result._tag === "Success" ||
+          (!existing && isAcknowledgedError(Cause.squash(result.cause)))
+        )
           acknowledgeSubmission(registry, key, requestId);
         return result;
       },
