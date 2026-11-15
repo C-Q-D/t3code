@@ -268,6 +268,7 @@ async function setup(
         ) : null}
         <textarea
           data-test-editor
+          data-testid="composer-editor"
           onKeyDown={(event) => {
             const intent = composerSubmissionIntentForKey({
               event: event.nativeEvent,
@@ -509,6 +510,16 @@ it.each(["Control", "Meta"])(
     expect(h.toggle().getAttribute("aria-checked")).toBe("true");
     await act(async () => h.toggle().click());
     expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    await act(async () => h.toggle().click());
+    expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+    await act(async () => {
+      const label = document.querySelector<HTMLLabelElement>("label.composer-assist-title")!;
+      // Native label activation focuses the associated checkbox before the visible switch.
+      document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.focus();
+      label.click();
+    });
+    expect(h.trigger().getAttribute("aria-label")).toContain(t.composer.assist.tools.clickSend);
+    expect(h.toggle().getAttribute("aria-disabled")).not.toBe("true");
     await act(async () => h.toggle().click());
     expect(h.toggle().getAttribute("aria-checked")).toBe("true");
     await act(async () => {
