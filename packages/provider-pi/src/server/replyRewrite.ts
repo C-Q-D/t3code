@@ -125,12 +125,14 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
       .pipe(Effect.mapError((cause) => new PiReplyRewriteError({ code: "configuration", cause })));
     const extensionPath = path.join(cwd, "reply-rewrite-extension.mjs");
     const systemPromptPath = path.join(cwd, "system-prompt.txt");
+    const appendPromptPath = path.join(cwd, "append-system-prompt.txt");
     yield* Effect.gen(function* () {
       yield* fs.makeDirectory(path.join(cwd, ".pi"));
       // RPC retry setters persist globally; project settings isolate both retry layers instead.
       yield* fs.writeFileString(path.join(cwd, ".pi", "settings.json"), REWRITE_SETTINGS);
       yield* fs.writeFileString(extensionPath, PI_REPLY_REWRITE_EXTENSION_SOURCE);
       yield* fs.writeFileString(systemPromptPath, input.systemPrompt);
+      yield* fs.writeFileString(appendPromptPath, "");
     }).pipe(Effect.mapError((cause) => new PiReplyRewriteError({ code: "configuration", cause })));
 
     const binary = input.binaryPath || "pi";
@@ -165,6 +167,8 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
         "--approve",
         "--system-prompt",
         systemPromptPath,
+        "--append-system-prompt",
+        appendPromptPath,
         "--extension",
         extensionPath,
       ],

@@ -536,13 +536,17 @@ it.effect("does not prompt if the dedicated extension never becomes ready", () =
 // This fixture loads the materialized extension but never loads Pi or provider credentials.
 const PROCESS_FIXTURE = `
 import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 const handlers = new Map();
 const emit = (record) => process.stdout.write(JSON.stringify(record) + "\\n");
 const systemSource = process.argv[process.argv.indexOf("--system-prompt") + 1];
-const systemPrompt = existsSync(systemSource) ? readFileSync(systemSource, "utf8") : systemSource;
+const basePrompt = existsSync(systemSource) ? readFileSync(systemSource, "utf8") : systemSource;
+const appendIndex = process.argv.indexOf("--append-system-prompt");
+const appendSource = appendIndex >= 0 ? process.argv[appendIndex + 1] : join(process.env.FIXTURE_PI_GLOBAL_DIR, "APPEND_SYSTEM.md");
+const systemPrompt = basePrompt + (existsSync(appendSource) ? readFileSync(appendSource, "utf8") : "");
 const extensionPath = process.argv[process.argv.indexOf("--extension") + 1];
 (await import(pathToFileURL(extensionPath).href)).default({
   on: (name, handler) => handlers.set(name, handler),
@@ -588,11 +592,18 @@ for await (const chunk of process.stdin) {
 }
 `;
 
-const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function* (useCmd = false) {
+const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function* (
+  useCmd = false,
+  globalAppend = false,
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pi-rewrite-fixture-" });
   const binaryPath = path.join(directory, "fixture.mjs");
+  const globalDir = path.join(directory, "fixture-global");
+  yield* fs.makeDirectory(globalDir);
+  if (globalAppend)
+    yield* fs.writeFileString(path.join(globalDir, "APPEND_SYSTEM.md"), "UNWANTED_GLOBAL_APPEND");
   yield* fs.writeFileString(binaryPath, PROCESS_FIXTURE);
   const cmdPath = path.join(directory, "pi.cmd");
   if (useCmd)
@@ -645,10 +656,24 @@ const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function*
       SystemRoot: process.env["SystemRoot"],
       PATH: directory,
       PATHEXT: ".CMD;.EXE",
+      FIXTURE_PI_GLOBAL_DIR: globalDir,
     }),
   );
   return { runner, pending, binaryPath: useCmd ? "" : binaryPath, commands };
 });
+
+it.live("overrides global append discovery with an owned empty prompt file", () =>
+  Effect.gen(function* () {
+    const fixture = yield* makeProcessFixture(false, true);
+    const result = yield* fixture.runner.run({
+      ...input,
+      sourceText: "inspect-system",
+      binaryPath: fixture.binaryPath,
+    });
+    assert.equal(result.text, "Keep all facts.");
+    assert.notInclude(result.text, "UNWANTED_GLOBAL_APPEND");
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
 
 it.live.each(HostProcess.Platform.defaultValue() === "win32" ? [false, true] : [false])(
   "preserves a multiline system prompt through the installed CLI path, cmd=%s",
