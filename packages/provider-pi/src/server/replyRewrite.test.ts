@@ -624,6 +624,34 @@ it.effect(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
+it.effect("releases ownership when cancelled before the worker starts", () =>
+  Effect.gen(function* () {
+    const owner = yield* Scope.make();
+    const pi = yield* makeFakePi().pipe(Effect.provideService(Scope.Scope, owner));
+    const request = yield* pi.runner.run(input).pipe(Effect.forkChild({ startImmediately: true }));
+    yield* Fiber.interrupt(request);
+    const idle = yield* pi.runner.awaitIdle.pipe(
+      Effect.timeoutOption(1),
+      Effect.forkChild({ startImmediately: true }),
+    );
+    yield* TestClock.adjust(1);
+    const result = yield* Fiber.join(idle);
+    if (result._tag === "None") {
+      const shutdown = yield* Scope.close(owner, Exit.void).pipe(
+        Effect.forkChild({ startImmediately: true }),
+      );
+      yield* TestClock.adjust(1_000);
+      yield* Fiber.join(shutdown);
+    }
+    assert.equal(result._tag, "Some");
+    assert.isNull((yield* pi.runner.getState).active);
+    assert.lengthOf(pi.commands, 0);
+    const next = yield* pi.runner.run({ ...input, requestId: "after-early-cancel" });
+    assert.equal(next.text, " 改写\n完整 ");
+    yield* Scope.close(owner, Exit.void);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
 it.effect("bounds service scope shutdown and retains ownership until cleanup finishes", () =>
   Effect.gen(function* () {
     const logs: unknown[] = [];

@@ -413,10 +413,10 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
             : 1;
         const cleanupBudgetMs = Math.min(1_000, Math.max(1, Math.ceil(timeoutMs / 10)));
         // The instance owns this single worker; its service finalizer only waits a bounded time.
-        resources.worker = yield* Effect.uninterruptibleMask((restoreWorker) =>
+        resources.worker = yield* Effect.uninterruptible(
           Effect.gen(function* () {
             const requestScope = yield* Scope.make();
-            const outcome = yield* restoreWorker(
+            const outcome = yield* Effect.interruptible(
               execute(input, resources).pipe(
                 Effect.provideService(Scope.Scope, requestScope),
                 Effect.timeoutOrElse({
@@ -432,7 +432,7 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
             yield* Deferred.done(resources.result, outcome);
             yield* Deferred.succeed(resources.finished, undefined);
           }),
-        ).pipe(Effect.forkDetach({ startImmediately: false, uninterruptible: false }));
+        ).pipe(Effect.forkDetach({ startImmediately: false, uninterruptible: true }));
         return yield* restore(
           Deferred.await(resources.result).pipe(
             Effect.timeoutOrElse({
