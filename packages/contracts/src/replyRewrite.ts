@@ -234,14 +234,6 @@ export const REPLY_REWRITE_RPC_SCOPES = {
   [REPLY_REWRITE_WS_METHODS.subscribe]: AuthOrchestrationReadScope,
 } as const;
 
-export const ReplyRewriteRpcSchemas = {
-  getDetail: { input: ReplyRewriteGetDetailInput, output: ReplyRewriteGetDetailResult },
-  request: { input: ReplyRewriteRequestInput, output: ReplyRewriteRecord },
-  cancel: { input: ReplyRewriteCancelInput, output: ReplyRewriteRecord },
-  list: { input: ReplyRewriteListInput, output: ReplyRewriteListResult },
-  subscribe: { input: ReplyRewriteSubscribeInput, output: ReplyRewriteChange },
-} as const;
-
 const ReplyRewriteRpcError = Schema.Union([ReplyRewriteError, EnvironmentAuthorizationError]);
 
 /** Merged into WsRpcGroup; handlers delegate to the destination's rewrite service. */
