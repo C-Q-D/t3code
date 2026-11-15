@@ -41,6 +41,7 @@ const sessions = Atom.family((_environmentId: EnvironmentId) =>
   Atom.make<AsyncResult.AsyncResult<AuthSessionState, never>>(AsyncResult.initial()),
 );
 const env = EnvironmentId.make("destination");
+const isReplyRewriteError = Schema.is(ReplyRewriteError);
 const target = {
   threadId: ThreadId.make("thread"),
   runId: RunId.make("run"),
@@ -242,9 +243,7 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
               Stream.concat(
                 Stream.fromQueue(events).pipe(
                   Stream.mapEffect((event) =>
-                    Schema.is(ReplyRewriteError)(event)
-                      ? Effect.fail(event)
-                      : Effect.succeed(event),
+                    isReplyRewriteError(event) ? Effect.fail(event) : Effect.succeed(event),
                   ),
                 ),
               ),
