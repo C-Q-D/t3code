@@ -15,23 +15,27 @@ export function composerReplyRewriteState(input: {
   readonly activeRun?: { readonly replyRewrite?: boolean | undefined } | null | undefined;
   readonly prompt?: string;
   readonly sideChatAvailable?: boolean;
+  readonly sideChatThread?: boolean;
 }) {
   const sideChat = parseSideChatCommand(input.prompt ?? "");
   const inherited =
     input.running &&
     (input.dispatchMode === "steer" || input.dispatchMode === "restart") &&
     !(sideChat && input.sideChatAvailable);
-  const supported = input.provider === "codex";
+  const sideChatReply =
+    input.sideChatThread === true || Boolean(sideChat && input.sideChatAvailable);
+  const supported = input.provider === "codex" && !sideChatReply;
   const selected = supported && (input.selection?.enabled ?? input.defaultEnabled);
   const saved = inherited ? input.activeRun?.replyRewrite : undefined;
   return {
     sideChat,
     inherited,
     supported,
+    sideChatReply,
     known: !inherited || saved !== undefined,
-    checked: inherited ? (saved ?? false) : selected,
+    checked: supported && (inherited ? (saved ?? false) : selected),
     // A completed run can turn a steer into a new run on the server.
-    replyRewrite: saved ?? selected,
+    replyRewrite: supported && (saved ?? selected),
   };
 }
 

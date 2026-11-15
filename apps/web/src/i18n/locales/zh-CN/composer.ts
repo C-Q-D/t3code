@@ -27,6 +27,7 @@ export const composer: Messages["composer"] = {
       rewriteOn: "本次回复改写已开启",
       rewriteOff: "本次回复改写已关闭",
       codexOnly: "仅支持 Codex 来源的回复",
+      sideChatUnavailable: "侧聊回复暂不支持改写",
       inherited: "追加指令沿用当前回复的改写设置",
       unknownRun: "当前回复的改写设置未知",
       unavailable: "当前无法更改回复改写设置",

@@ -497,6 +497,7 @@ export function useComposerSend(input: ComposerSendInput) {
       activeRun: input.activeReplyRewriteRun,
       prompt: sendCtx && !directAnnotation && !queuedRunEdit.isEditing ? promptAtSend : "",
       sideChatAvailable: onSideChat !== undefined && sideChatDisabledReason === null,
+      sideChatThread: activeThread?.lineage?.sideChat === true,
     });
     const replyRewrite = replyRewriteState.replyRewrite;
     const completeReplyRewriteSend = () =>
@@ -537,7 +538,6 @@ export function useComposerSend(input: ComposerSendInput) {
         return;
       }
       const started = await onSideChat(sideChatCommand.prompt, replyRewrite);
-      if (started) completeReplyRewriteSend();
       // Clear only what was sent; the user may have edited the draft or left meanwhile.
       if (
         started &&

@@ -649,6 +649,7 @@ it.effect.each([
 it.effect.each([
   { child: true, sideChat: false, status: "completed" as const },
   { child: false, sideChat: true, status: "completed" as const },
+  { child: false, sideChat: true, status: "completed" as const, replyRewrite: false },
   { child: false, sideChat: false, status: "failed" as const },
   { driver: "claudeCode", status: "completed" as const },
 ])("excludes non-user-success sources: %j", (options) =>
@@ -657,7 +658,7 @@ it.effect.each([
     yield* Effect.gen(function* () {
       const fixture = yield* seed({
         ...options,
-        replyRewrite: true,
+        replyRewrite: "replyRewrite" in options ? options.replyRewrite : true,
         classification: { kind: "final", source: "codex_phase" },
       });
       const settings = yield* Settings.ServerSettingsService;
@@ -671,6 +672,7 @@ it.effect.each([
         .pipe(Effect.flip);
       assert.isTrue(isReplyRewriteError(error));
       assert.equal(isReplyRewriteError(error) ? error.code : "unexpected", "not_eligible");
+      assert.isNull(yield* service.getDetail(fixture.target));
       assert.equal(yield* (yield* Worker.ReplyRewriteWorker).drain, 0);
     }).pipe(Effect.provide(testLayer(controlled.runner)));
   }),

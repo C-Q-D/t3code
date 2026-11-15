@@ -441,6 +441,7 @@ export interface ChatComposerProps {
   /** Cached report for the context popup; independent of the dismissible usage banner. */
   usageLimitsReport?: UsageLimitsReport | null | undefined;
   sideChatAvailable?: boolean;
+  sideChatThread?: boolean;
   sideChatDisabledReason?: string | null;
   environmentUnavailable: {
     readonly label: string;
@@ -4170,6 +4171,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       !canOperateThread || noProviderAvailable || pendingUserInputs.length > 0
                     }
                     activeRun={props.replyRewriteRun}
+                    sideChatThread={props.sideChatThread === true}
                     prompt={prompt}
                     sideChatAvailable={
                       props.sideChatAvailable === true && !props.sideChatDisabledReason

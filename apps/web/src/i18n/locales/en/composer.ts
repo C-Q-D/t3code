@@ -27,6 +27,7 @@ export const composer = {
       rewriteOn: "Reply rewrite on",
       rewriteOff: "Reply rewrite off",
       codexOnly: "Available for Codex replies only",
+      sideChatUnavailable: "Reply rewrite is not available in side chats",
       inherited: "Additional instructions use the current reply's rewrite setting",
       unknownRun: "The current reply's rewrite setting is unknown",
       unavailable: "Reply rewrite cannot be changed right now",

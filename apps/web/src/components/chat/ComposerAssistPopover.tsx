@@ -37,12 +37,12 @@ export function ComposerAssistPopover({
   const warning = optimizer.visible && !optimizer.disabledReason && optimizer.cacheMaybeExpired;
   const optimizeReason = optimizer.visible ? optimizer.disabledReason : copy.optimizeUnavailable;
   const rewriteReason = !supported
-    ? copy.codexOnly
+    ? (rewrite?.disabledReason ?? copy.codexOnly)
     : !known
       ? [rewrite?.disabledReason, copy.unknownRun].filter(Boolean).join(" · ")
       : (rewrite?.disabledReason ?? null);
   const rewriteLabel = !supported
-    ? copy.codexOnly
+    ? (rewrite?.disabledReason ?? copy.codexOnly)
     : !known
       ? copy.unknownRun
       : checked

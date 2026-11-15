@@ -3656,6 +3656,7 @@ export default function ChatView(props: ChatViewProps) {
                           ) : null}
                           {!composerMounted ? null : (
                             <ChatComposer
+                              sideChatThread={activeThread?.lineage.sideChat === true}
                               replyRewriteRun={
                                 queuedRunEdit.isEditing
                                   ? (serverProjection?.runs.find(

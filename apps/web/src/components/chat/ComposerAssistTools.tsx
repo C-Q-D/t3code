@@ -30,6 +30,7 @@ export function ComposerAssistTools(props: {
   unavailable: boolean;
   prompt: string;
   sideChatAvailable: boolean;
+  sideChatThread?: boolean;
   activeRun: { readonly replyRewrite?: boolean | undefined } | null | undefined;
   optimizer: ReturnType<typeof useComposerPromptOptimizer>;
   shortcut?: string | null;
@@ -66,10 +67,13 @@ export function ComposerAssistTools(props: {
     activeRun: props.activeRun,
     prompt: props.editingQueue ? "" : props.prompt,
     sideChatAvailable: props.sideChatAvailable,
+    sideChatThread: props.sideChatThread === true,
   });
   const copy = t.composer.assist.tools;
   const disabledReason = !state.supported
-    ? copy.codexOnly
+    ? state.sideChatReply
+      ? copy.sideChatUnavailable
+      : copy.codexOnly
     : props.editingQueue
       ? copy.editingQueue
       : state.inherited

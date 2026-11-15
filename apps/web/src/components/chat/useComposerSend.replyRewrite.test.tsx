@@ -52,6 +52,7 @@ async function setup(
     provider?: string;
     resume?: boolean;
     side?: boolean;
+    sideThread?: boolean;
     tools?: boolean;
     legacy?: boolean;
     editingQueue?: boolean;
@@ -117,6 +118,7 @@ async function setup(
         id: threadId,
         environmentId,
         worktreePath: null,
+        lineage: { sideChat: options.sideThread === true },
         createdAt: "2026-01-01T00:00:00Z",
       },
       activeThreadKey: routeKey,
@@ -248,6 +250,7 @@ async function setup(
             unavailable={false}
             prompt={promptValue}
             sideChatAvailable={options.side ?? false}
+            sideChatThread={options.sideThread === true}
             activeRun={options.legacy ? {} : { replyRewrite: options.saved ?? false }}
             optimizer={{
               visible: false,
@@ -457,7 +460,7 @@ it("snapshots resume before settings persistence and resets only after its new r
   ]);
 });
 
-it("passes the next reply choice into a side-chat send and retains it on failure", async () => {
+it("keeps the main reply choice after side-chat success or failure", async () => {
   await using h = await setup({ side: true });
   const store = useComposerDraftStore.getState();
   store.setReplyRewrite(h.target, true);
@@ -473,12 +476,12 @@ it("passes the next reply choice into a side-chat send and retains it on failure
     await h.press("button");
   });
   expect(fake.side.mock.calls).toEqual([
-    ["Explain this", true],
-    ["Explain this", true],
+    ["Explain this", false],
+    ["Explain this", false],
   ]);
   expect(
-    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId],
-  ).toBeUndefined();
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId]?.enabled,
+  ).toBe(true);
 });
 
 it.each([
@@ -563,24 +566,32 @@ it("switches from the default queue choice to inherited steering while the alter
   expect(h.toggle().getAttribute("aria-checked")).toBe("true");
 });
 
-it("shows a side-chat new run's independent choice during an active reply and sends the edited choice", async () => {
+it.each([false, true])("disables rewrite for side chat, existing thread=%s", async (sideThread) => {
   await using h = await setup({
     tools: true,
     running: true,
     saved: false,
     side: true,
-    mode: "steer",
+    sideThread,
+    mode: "queue",
   });
   await h.setDefault(true);
-  await h.setPrompt("/side Explain this");
+  await h.setPrompt(sideThread ? "Explain this" : "/side Explain this");
   await h.openTools();
-  expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+  expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+  expect(h.toggle().getAttribute("aria-disabled")).toBe("true");
+  expect(document.body.textContent).toContain(t.composer.assist.tools.sideChatUnavailable);
   await act(async () => h.toggle().click());
   expect(h.toggle().getAttribute("aria-checked")).toBe("false");
   await act(async () => {
     await h.press("button");
   });
-  expect(fake.side.mock.calls).toEqual([["Explain this", false]]);
+  if (sideThread) {
+    expect(fake.start.mock.calls[0]?.[0].input).toMatchObject({ replyRewrite: false });
+    expect(fake.side).not.toHaveBeenCalled();
+  } else {
+    expect(fake.side.mock.calls).toEqual([["Explain this", false]]);
+  }
 });
 
 it.each([false, true])(
@@ -824,6 +835,6 @@ it("keeps a mod-enter side chat independent of the active run's keyboard setting
   await act(async () => {
     await h.press("keyboard", { key: "Enter", ctrlKey: true });
   });
-  expect(fake.side.mock.calls).toEqual([["Explain this", true]]);
-  expect(shown).toBe("true");
+  expect(fake.side.mock.calls).toEqual([["Explain this", false]]);
+  expect(shown).toBe("false");
 });
