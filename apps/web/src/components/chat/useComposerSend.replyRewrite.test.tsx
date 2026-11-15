@@ -6,10 +6,20 @@ import { DEFAULT_UNIFIED_SETTINGS, EnvironmentId, ThreadId, RunId } from "@t3too
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { AsyncResult } from "effect/reactivity";
 import { ComposerAssistTools } from "./ComposerAssistTools";
+import { useComposerSendPreviewTarget } from "./useComposerSendPreviewTarget";
 import { t } from "~/i18n";
 import { resolveComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
 import type { ComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
 import { useComposerDraftStore } from "../../composerDraftStore";
+import {
+  composerSubmissionIntentForKey,
+  type ComposerSubmissionIntent,
+} from "../../composer-logic";
+import {
+  DEFAULT_RESOLVED_KEYBINDINGS,
+  compileResolvedKeybindingsConfig,
+} from "@t3tools/shared/keybindings";
+import type { ResolvedKeybindingsConfig, ClientSettings } from "@t3tools/contracts";
 import { submitComposerDraft } from "./composerSubmission";
 import { useComposerSend } from "./useComposerSend";
 import { useComposerResume } from "./useComposerResume";
@@ -46,6 +56,9 @@ async function setup(
     legacy?: boolean;
     editingQueue?: boolean;
     followUp?: "steer" | "queue";
+    platform?: string;
+    sendShortcut?: ClientSettings["sendShortcut"];
+    keybindings?: ResolvedKeybindingsConfig;
   } = {},
 ) {
   vi.mocked(readEnvironmentScope).mockReturnValue(true);
@@ -93,6 +106,7 @@ async function setup(
   };
   let pending: Promise<void> | undefined;
   function Harness({ autoValue, promptValue }: { autoValue: boolean; promptValue: string }) {
+    const previewTarget = useComposerSendPreviewTarget();
     const sendInput = {
       environmentId,
       routeThreadKey: routeKey,
@@ -180,7 +194,10 @@ async function setup(
       hasHeldQueuedRuns: false,
       scrollToEnd: noop,
     });
-    const submit = (event: { ctrlKey: boolean; metaKey: boolean }) =>
+    const submit = (
+      event: { ctrlKey: boolean; metaKey: boolean },
+      intent?: ComposerSubmissionIntent,
+    ) =>
       submitComposerDraft({
         event: undefined,
         prompt: promptRef.current,
@@ -194,18 +211,33 @@ async function setup(
                   (options.tools
                     ? resolveComposerDispatchMode({
                         running: options.running ?? false,
-                        alternateModifier: event.ctrlKey || event.metaKey,
+                        alternateModifier:
+                          intent === undefined
+                            ? event.ctrlKey || event.metaKey
+                            : intent === "alternate",
                         activeTurnDefault: options.followUp ?? "steer",
                       })
                     : "auto"),
+                intent,
               );
         },
       });
     return (
-      <>
+      <form
+        onSubmit={(event) => event.preventDefault()}
+        onPointerOverCapture={previewTarget.onPointerOverCapture}
+        onKeyDownCapture={previewTarget.onKeyDownCapture}
+        onFocusCapture={previewTarget.onFocusCapture}
+      >
         {options.tools ? (
           <ComposerAssistTools
             environmentId={environmentId}
+            previewButton={previewTarget.previewButton}
+            keybindings={options.keybindings ?? DEFAULT_RESOLVED_KEYBINDINGS}
+            platform={options.platform ?? "Win32"}
+            sendShortcut={options.sendShortcut ?? "enter"}
+            draftThread={false}
+            softwareKeyboardOpen={false}
             target={target}
             provider={options.provider ?? "codex"}
             defaultEnabled={autoValue}
@@ -234,16 +266,31 @@ async function setup(
             }}
           />
         ) : null}
-        <button
-          data-test-send
-          onClick={submit}
+        <textarea
+          data-test-editor
           onKeyDown={(event) => {
-            if (event.key === "Enter") submit(event);
+            const intent = composerSubmissionIntentForKey({
+              event: event.nativeEvent,
+              keybindings: options.keybindings ?? DEFAULT_RESOLVED_KEYBINDINGS,
+              platform: options.platform ?? "Win32",
+              isSoftwareKeyboardOpen: false,
+              isDraftThread: false,
+              isRunning: options.running ?? false,
+              sendShortcut: options.sendShortcut ?? "enter",
+              prompt: promptRef.current,
+            });
+            if (intent !== null) submit(event, intent);
           }}
+        />
+        <button
+          type="button"
+          data-test-send
+          data-composer-send-preview="button"
+          onClick={(event) => submit(event)}
         >
           Send
         </button>
-      </>
+      </form>
     );
   }
   const host = document.createElement("div");
@@ -252,15 +299,21 @@ async function setup(
   await act(async () => root.render(<Harness autoValue={auto} promptValue={promptRef.current} />));
   const press = (
     kind: "button" | "keyboard",
-    modifiers: { ctrlKey?: boolean; metaKey?: boolean } = {},
+    modifiers: {
+      ctrlKey?: boolean;
+      metaKey?: boolean;
+      altKey?: boolean;
+      shiftKey?: boolean;
+      key?: string;
+    } = {},
   ) => {
     const button = host.querySelector<HTMLButtonElement>("[data-test-send]")!;
     if (kind === "button")
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, ...modifiers }));
     else
-      button.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, ...modifiers }),
-      );
+      host
+        .querySelector("textarea")!
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, ...modifiers }));
     return pending;
   };
   return {
@@ -273,6 +326,16 @@ async function setup(
       );
     },
     trigger: () => host.querySelector<HTMLButtonElement>('[data-slot="popover-trigger"]')!,
+    focusEditor: async () => {
+      await act(async () => host.querySelector("textarea")!.focus());
+    },
+    pointAtSend: async () => {
+      await act(async () =>
+        host
+          .querySelector("[data-test-send]")!
+          .dispatchEvent(new Event("pointerover", { bubbles: true })),
+      );
+    },
     toggle: () => document.querySelector<HTMLElement>('[role="switch"]')!,
     key: async (type: "keydown" | "keyup", key: string) => {
       await act(async () => window.dispatchEvent(new KeyboardEvent(type, { key })));
@@ -441,6 +504,7 @@ it.each(["Control", "Meta"])(
     await h.openTools();
     expect(h.toggle().getAttribute("aria-checked")).toBe("false");
     expect(document.body.textContent).toContain(t.composer.assist.tools.inherited);
+    await h.pointAtSend();
     await h.key("keydown", key);
     expect(h.toggle().getAttribute("aria-checked")).toBe("true");
     await act(async () => h.toggle().click());
@@ -466,7 +530,13 @@ it.each(["Control", "Meta"])(
 );
 
 it("switches from the default queue choice to inherited steering while the alternate key is held", async () => {
-  await using h = await setup({ tools: true, running: true, saved: false, followUp: "queue" });
+  await using h = await setup({
+    tools: true,
+    running: true,
+    saved: false,
+    followUp: "queue",
+    platform: "MacIntel",
+  });
   await h.setDefault(true);
   await h.openTools();
   expect(h.toggle().getAttribute("aria-checked")).toBe("true");
@@ -542,4 +612,207 @@ it("announces a non-Codex provider as unavailable instead of an unknown legacy s
   expect(
     useComposerDraftStore.getState().getComposerDraft(h.target)?.replyRewriteSelections,
   ).toBeUndefined();
+});
+
+const customAlternate = (key: string) =>
+  compileResolvedKeybindingsConfig([
+    { key, command: "composer.sendAlternate", when: "composerFocus && turnRunning" },
+  ]);
+
+it.each([
+  {
+    platform: "Win32",
+    sendShortcut: "enter",
+    key: "Enter",
+    held: ["Control"],
+    ctrlKey: true,
+    expected: true,
+    mode: "queue",
+  },
+  {
+    platform: "MacIntel",
+    sendShortcut: "enter",
+    key: "Enter",
+    held: ["Meta"],
+    metaKey: true,
+    expected: true,
+    mode: "queue",
+  },
+  {
+    platform: "Win32",
+    sendShortcut: "mod-enter",
+    key: "Enter",
+    held: ["Control"],
+    ctrlKey: true,
+    expected: false,
+    mode: "steer",
+  },
+  {
+    platform: "MacIntel",
+    sendShortcut: "mod-enter",
+    key: "Enter",
+    held: ["Meta"],
+    metaKey: true,
+    expected: false,
+    mode: "steer",
+  },
+  {
+    platform: "Win32",
+    sendShortcut: "mod-enter",
+    key: "Enter",
+    held: ["Control", "Shift"],
+    ctrlKey: true,
+    shiftKey: true,
+    expected: true,
+    mode: "queue",
+  },
+  {
+    platform: "MacIntel",
+    sendShortcut: "mod-enter",
+    key: "Enter",
+    held: ["Meta", "Shift"],
+    metaKey: true,
+    shiftKey: true,
+    expected: true,
+    mode: "queue",
+  },
+  {
+    platform: "Win32",
+    sendShortcut: "enter",
+    key: "y",
+    held: ["Alt"],
+    altKey: true,
+    binding: "alt+y",
+    expected: true,
+    mode: "queue",
+  },
+  {
+    platform: "MacIntel",
+    sendShortcut: "mod-enter",
+    key: "k",
+    held: ["Meta"],
+    metaKey: true,
+    binding: "mod+k",
+    expected: true,
+    mode: "queue",
+  },
+  {
+    platform: "Win32",
+    sendShortcut: "enter",
+    key: "F8",
+    held: [],
+    binding: "f8",
+    expected: true,
+    mode: "queue",
+  },
+] as const)(
+  "previews the formally parsed $platform $sendShortcut $key keyboard action ($binding)",
+  async (entry) => {
+    const keybindings =
+      "binding" in entry ? customAlternate(entry.binding) : DEFAULT_RESOLVED_KEYBINDINGS;
+    await using h = await setup({
+      tools: true,
+      running: true,
+      saved: false,
+      platform: entry.platform,
+      sendShortcut: entry.sendShortcut,
+      keybindings,
+    });
+    await h.setDefault(true);
+    await h.openTools();
+    for (const key of entry.held) await h.key("keydown", key);
+    const shown = h.toggle().getAttribute("aria-checked");
+    expect(h.trigger().getAttribute("aria-label")).toContain(
+      entry.key.length === 1 ? entry.key.toUpperCase() : entry.key,
+    );
+    await act(async () => {
+      await h.press("keyboard", entry);
+    });
+    expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
+      { dispatchMode: entry.mode, replyRewrite: entry.expected },
+    ]);
+    expect(shown).toBe(String(entry.expected));
+  },
+);
+
+it.each([
+  { platform: "Win32", held: "Control", ctrlKey: true, label: "Ctrl+Enter" },
+  { platform: "MacIntel", held: "Meta", metaKey: true, label: "⌘Enter" },
+] as const)(
+  "distinguishes the $platform mod-enter keyboard preview from a modified Send click",
+  async (entry) => {
+    await using h = await setup({
+      tools: true,
+      running: true,
+      saved: false,
+      platform: entry.platform,
+      sendShortcut: "mod-enter",
+    });
+    await h.setDefault(true);
+    await h.openTools();
+    await h.key("keydown", entry.held);
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    expect(h.trigger().getAttribute("aria-label")).toContain(
+      t.composer.assist.tools.keyboardSend(entry.label),
+    );
+    await h.pointAtSend();
+    expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+    expect(h.trigger().getAttribute("aria-label")).toContain(t.composer.assist.tools.clickSend);
+    expect(document.body.textContent).toContain(t.composer.assist.tools.clickSend);
+    await act(async () => h.toggle().click());
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    await act(async () => h.toggle().click());
+    expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+    await act(async () => {
+      await h.press("button", entry);
+    });
+    expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
+      { dispatchMode: "queue", replyRewrite: true },
+    ]);
+    await h.openTools();
+    await h.focusEditor();
+    expect(h.trigger().getAttribute("aria-label")).toContain(
+      t.composer.assist.tools.keyboardSend(entry.label),
+    );
+  },
+);
+
+it("clears a custom alternate-key preview on release and window blur", async () => {
+  await using h = await setup({
+    tools: true,
+    running: true,
+    saved: false,
+    keybindings: customAlternate("alt+y"),
+  });
+  await h.setDefault(true);
+  await h.openTools();
+  await h.key("keydown", "Alt");
+  expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+  expect(h.trigger().getAttribute("aria-label")).toContain("Alt+Y");
+  await h.key("keyup", "Alt");
+  expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+  await h.key("keydown", "Alt");
+  expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+  await h.blur();
+  expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+});
+
+it("keeps a mod-enter side chat independent of the active run's keyboard setting", async () => {
+  await using h = await setup({
+    tools: true,
+    running: true,
+    saved: false,
+    side: true,
+    sendShortcut: "mod-enter",
+  });
+  await h.setDefault(true);
+  await h.setPrompt("/side Explain this");
+  await h.openTools();
+  await h.key("keydown", "Control");
+  const shown = h.toggle().getAttribute("aria-checked");
+  await act(async () => {
+    await h.press("keyboard", { key: "Enter", ctrlKey: true });
+  });
+  expect(fake.side.mock.calls).toEqual([["Explain this", true]]);
+  expect(shown).toBe("true");
 });

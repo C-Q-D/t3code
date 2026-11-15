@@ -16,6 +16,9 @@ export const composer: Messages["composer"] = {
   assist: {
     tools: {
       title: "表达工具",
+      clickSend: "点击发送按钮",
+      keyboardSend: (shortcut: string) => `按 ${shortcut} 发送`,
+      noKeyboardSend: "当前没有可用的发送快捷键",
       optimizeDescription: "理清表达，让提问更准确",
       optimizeNow: "立即优化",
       optimizeUnavailable: "提示词优化已关闭或未获授权",

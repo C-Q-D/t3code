@@ -14,9 +14,11 @@ export function ComposerAssistPopover({
   optimizer,
   shortcut,
   rewrite,
+  sendActionLabel,
 }: {
   optimizer: ReturnType<typeof useComposerPromptOptimizer>;
   shortcut?: string | null;
+  sendActionLabel?: string;
   rewrite?: {
     checked: boolean;
     known?: boolean;
@@ -56,7 +58,8 @@ export function ComposerAssistPopover({
             className="composer-assist-trigger w-8.5 p-0"
           />
         }
-        aria-label={`${copy.title} · ${rewriteLabel}`}
+        aria-label={[copy.title, sendActionLabel, rewriteLabel].filter(Boolean).join(" · ")}
+        data-composer-send-preview="button"
         data-rewrite-enabled={checked ? "true" : "false"}
         data-panel-open={open ? "true" : "false"}
       >
@@ -134,13 +137,13 @@ export function ComposerAssistPopover({
               checked={checked}
               mixed={supported && !known}
               disabled={rewriteReason !== null}
-              aria-describedby={rewriteReason ? `${id}-rewrite-help` : undefined}
+              aria-describedby={rewriteReason || sendActionLabel ? `${id}-rewrite-help` : undefined}
               onCheckedChange={(value) => rewrite?.onCheckedChange(value)}
             />
           </div>
-          {rewriteReason ? (
+          {rewriteReason || sendActionLabel ? (
             <p id={`${id}-rewrite-help`} className="composer-assist-help">
-              {rewriteReason}
+              {[sendActionLabel, rewriteReason].filter(Boolean).join(" · ")}
             </p>
           ) : null}
         </div>

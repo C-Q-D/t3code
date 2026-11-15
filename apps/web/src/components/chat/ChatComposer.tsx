@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link2Icon } from "lucide-react";
 import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
 import { ComposerAssistTools } from "./ComposerAssistTools";
+import { useComposerSendPreviewTarget } from "./useComposerSendPreviewTarget";
 import {
   ComposerPromptOptimizeTab,
   ComposerPromptOptimizeStatus,
@@ -797,6 +798,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const nonPersistedComposerImageIds = attachmentDraft.nonPersistedImageIds;
   const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   const openPrLink = useOpenPrLink(routeThreadRef);
+  const sendPreviewTarget = useComposerSendPreviewTarget();
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const previewFile = composerFiles.find((file) => file.id === previewFileId);
   const composerContextActions = {
@@ -3585,6 +3587,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
       }}
       onFocusCapture={(event) => {
+        sendPreviewTarget.onFocusCapture(event);
         const activeElement = event.target;
         if (
           activeElement instanceof Element &&
@@ -3633,6 +3636,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         composerMentionDragHandlers.onDrop(event);
       }}
       className="mx-auto w-full min-w-0 max-w-composer"
+      onPointerOverCapture={sendPreviewTarget.onPointerOverCapture}
+      onKeyDownCapture={sendPreviewTarget.onKeyDownCapture}
       data-chat-composer-form="true"
       data-composer-drop-target
       {...threadContextDropTargetProps()}
@@ -4147,6 +4152,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   className="flex shrink-0 flex-nowrap items-center justify-end gap-2"
                 >
                   <ComposerAssistTools
+                    keybindings={keybindings}
+                    sendShortcut={settings.sendShortcut}
+                    draftThread={routeKind === "draft"}
+                    softwareKeyboardOpen={isSoftwareKeyboardOpen}
+                    previewButton={sendPreviewTarget.previewButton}
                     key={`${environmentId}:${composerDraftTargetKey}`}
                     environmentId={environmentId}
                     target={composerDraftTarget}

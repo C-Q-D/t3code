@@ -344,6 +344,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       )}
       {...pointerFocusProps}
       onClick={showResume ? onResume : onSubmitMessage}
+      data-composer-send-preview="button"
       disabled={submissionState.disabled}
       aria-busy={submissionState.busy}
       aria-label={submitStatus ?? submitLabel}

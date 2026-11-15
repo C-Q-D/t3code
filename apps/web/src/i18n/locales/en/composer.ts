@@ -16,6 +16,9 @@ export const composer = {
   assist: {
     tools: {
       title: "Writing tools",
+      clickSend: "Click Send",
+      keyboardSend: (shortcut: string) => `Send with ${shortcut}`,
+      noKeyboardSend: "No send shortcut is available",
       optimizeDescription: "Clarify your wording for a more precise question",
       optimizeNow: "Improve now",
       optimizeUnavailable: "Prompt improvement is disabled or not permitted",

@@ -1,5 +1,5 @@
 /** Keeps composer writing tools tied to the current draft and dispatch intent. */
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { ClientSettings, EnvironmentId, ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import {
   resolveComposerDispatchMode,
   type ActiveTurnComposerAction,
@@ -10,9 +10,16 @@ import { ComposerAssistPopover } from "./ComposerAssistPopover";
 import { composerReplyRewriteState } from "./composerSend.logic";
 import type { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
 import { useShortcutModifierState } from "../../shortcutModifierState";
+import { composerReplyRewriteKeyboardAction } from "./composerReplyRewriteKeyboard";
 
 export function ComposerAssistTools(props: {
   environmentId: EnvironmentId;
+  keybindings: ResolvedKeybindingsConfig;
+  sendShortcut: ClientSettings["sendShortcut"];
+  draftThread: boolean;
+  softwareKeyboardOpen: boolean;
+  platform?: string;
+  previewButton?: boolean;
   target: ComposerThreadTarget;
   provider: string;
   defaultEnabled: boolean;
@@ -28,6 +35,16 @@ export function ComposerAssistTools(props: {
   shortcut?: string | null;
 }) {
   const modifiers = useShortcutModifierState();
+  const keyboardAction = composerReplyRewriteKeyboardAction({
+    keybindings: props.keybindings,
+    sendShortcut: props.sendShortcut,
+    isDraftThread: props.draftThread,
+    isSoftwareKeyboardOpen: props.softwareKeyboardOpen,
+    isRunning: props.running,
+    prompt: props.prompt,
+    platform: props.platform ?? navigator.platform,
+    modifiers,
+  });
   const selection = useComposerDraftStore(
     (state) => state.getComposerDraft(props.target)?.replyRewriteSelections?.[props.environmentId],
   );
@@ -40,7 +57,9 @@ export function ComposerAssistTools(props: {
       ? "steer"
       : resolveComposerDispatchMode({
           running: props.running,
-          alternateModifier: modifiers.ctrlKey || modifiers.metaKey,
+          alternateModifier: props.previewButton
+            ? modifiers.ctrlKey || modifiers.metaKey
+            : keyboardAction?.intent === "alternate",
           activeTurnDefault: props.followUpBehavior,
           canSteer: props.canSteer,
         }),
@@ -57,11 +76,20 @@ export function ComposerAssistTools(props: {
         ? copy.inherited
         : props.unavailable
           ? copy.unavailable
-          : null;
+          : !props.previewButton && keyboardAction === null
+            ? copy.noKeyboardSend
+            : null;
   return (
     <ComposerAssistPopover
       optimizer={props.optimizer}
       shortcut={props.shortcut ?? null}
+      sendActionLabel={
+        props.previewButton
+          ? copy.clickSend
+          : keyboardAction
+            ? copy.keyboardSend(keyboardAction.label)
+            : copy.noKeyboardSend
+      }
       rewrite={{
         checked: state.checked,
         known: state.known,
