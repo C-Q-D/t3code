@@ -760,6 +760,58 @@ it.effect.each(["classification", "run"] as const)(
 );
 
 it.effect(
+  "cancels only the matching target and request, leaving other running calls untouched",
+  () =>
+    Effect.gen(function* () {
+      const controlled = yield* makeControlledRunner;
+      yield* Effect.gen(function* () {
+        const fixture = yield* seed();
+        const service = yield* Service.ReplyRewriteService;
+        const worker = yield* Worker.ReplyRewriteWorker;
+        const outbox = yield* Outbox.EffectOutboxV2;
+        const targetB = { ...fixture.target, messageId: MessageId.make("message:B") };
+        yield* fixture.sink.write({
+          events: [
+            fixture.event({
+              type: "message.updated",
+              payload: { ...fixture.message, id: targetB.messageId, text: "B" },
+            }),
+          ],
+        });
+        yield* service.request({ ...fixture.target, requestId: "cancel-A" });
+        yield* service.request({ ...targetB, requestId: "cancel-B" });
+        const a = yield* worker.runOnce.pipe(Effect.forkScoped);
+        const callA = yield* Queue.take(controlled.calls);
+        yield* service.cancel({ ...targetB, requestId: "cancel-A" });
+        yield* service.cancel({ ...fixture.target, requestId: "wrong-request" });
+        assert.equal((yield* service.getDetail(targetB))?.currentAttempt?.status, "queued");
+        yield* Deferred.succeed(callA.result, output("A completed."));
+        yield* Fiber.join(a);
+        assert.equal((yield* service.getDetail(fixture.target))?.lastSuccess?.text, "A completed.");
+        const b = yield* worker.runOnce.pipe(Effect.forkScoped);
+        const callB = yield* Queue.take(controlled.calls);
+        yield* service.cancel({ ...targetB, requestId: "cancel-B" });
+        yield* Fiber.join(b);
+        yield* Deferred.succeed(callB.result, output("Late B."));
+        const cancelled = yield* service.getDetail(targetB);
+        assert.equal(cancelled?.currentAttempt?.status, "cancelled");
+        assert.isNull(cancelled?.lastSuccess);
+        const sql = yield* SqlClient.SqlClient;
+        const rows = yield* sql<{
+          status: string;
+          requestId: string;
+        }>`SELECT status, json_extract(payload_json, '$.requestId') AS requestId FROM orchestration_v2_effect_outbox WHERE effect_type = 'reply-rewrite.run' ORDER BY rowid`;
+        assert.deepEqual(rows, [
+          { status: "succeeded", requestId: "cancel-A" },
+          { status: "cancelled", requestId: "cancel-B" },
+        ]);
+        assert.equal(yield* worker.drain, 0);
+        assert.isTrue(Option.isNone(yield* outbox.claimNext({ workerId: "no-main-work" })));
+      }).pipe(Effect.provide(testLayer(controlled.runner)));
+    }),
+);
+
+it.effect(
   "accepts a final persisted after completion and cancels it before the external call when its source changes",
   () =>
     Effect.gen(function* () {

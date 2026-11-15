@@ -615,7 +615,7 @@ const make = Effect.gen(function* () {
     }),
     cancel: Effect.fn("ReplyRewrite.cancel")(function* (input) {
       yield* requireOperationScope(AuthOrchestrationOperateScope);
-      const record = yield* sql
+      const cancelled = yield* sql
         .withTransaction(
           Effect.gen(function* () {
             const current = yield* read(input);
@@ -629,17 +629,22 @@ const make = Effect.gen(function* () {
               attempt?.requestId !== input.requestId ||
               (attempt.status !== "queued" && attempt.status !== "running")
             )
-              return current;
+              return { record: current, effectIds: [] };
             const finishedAt = yield* nowIso;
             yield* sql`UPDATE reply_rewrites SET attempt_json = ${encodeAttempt({ ...attempt, status: "cancelled", finishedAt })}, updated_at = ${finishedAt} WHERE message_id = ${input.messageId}`;
-            yield* sql`UPDATE orchestration_v2_effect_outbox SET status = 'cancelled', lease_owner = NULL, updated_at = ${finishedAt}, completed_at = ${finishedAt} WHERE effect_id = ${jobId(input.requestId)} AND status IN ('pending', 'running')`;
+            const effects = yield* sql<{
+              effect_id: string;
+            }>`UPDATE orchestration_v2_effect_outbox SET status = 'cancelled', lease_owner = NULL, updated_at = ${finishedAt}, completed_at = ${finishedAt} WHERE effect_id = ${jobId(attempt.requestId)} AND status IN ('pending', 'running') RETURNING effect_id`;
             yield* changed(input);
-            return (yield* read(input))!;
+            return {
+              record: (yield* read(input))!,
+              effectIds: effects.map((row) => row.effect_id),
+            };
           }),
         )
         .pipe(Effect.catchTags({ SqlError: storageError }));
-      yield* outbox.signalCancellations([jobId(input.requestId)]).pipe(Effect.andThen(notify));
-      return record;
+      yield* outbox.signalCancellations(cancelled.effectIds).pipe(Effect.andThen(notify));
+      return cancelled.record;
     }),
     list: Effect.fn("ReplyRewrite.list")(function* (input: ReplyRewriteListInput) {
       yield* requireOperationScope(AuthOrchestrationReadScope);
