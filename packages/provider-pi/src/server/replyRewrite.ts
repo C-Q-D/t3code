@@ -64,7 +64,17 @@ function tokenCount(value: unknown, key: string): number | undefined {
 }
 
 function readUsage(value: unknown, normalized: boolean): PiReplyRewriteOutput["usage"] {
-  const inputTokens = tokenCount(value, normalized ? "inputTokens" : "input");
+  const input = tokenCount(value, normalized ? "inputTokens" : "input");
+  // Pi separates cached input, while Responses reports it inside input_tokens.
+  const combinedInput =
+    input === undefined
+      ? undefined
+      : input +
+        (normalized
+          ? 0
+          : (tokenCount(value, "cacheRead") ?? 0) + (tokenCount(value, "cacheWrite") ?? 0));
+  const inputTokens =
+    combinedInput !== undefined && Number.isSafeInteger(combinedInput) ? combinedInput : undefined;
   const outputTokens = tokenCount(value, normalized ? "outputTokens" : "output");
   const totalTokens = tokenCount(value, "totalTokens");
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined)
@@ -149,6 +159,8 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
         "--no-context-files",
         "--no-prompt-templates",
         "--offline",
+        // Session-only trust applies to the runner-owned cwd, including its retry settings.
+        "--approve",
         "--system-prompt",
         input.systemPrompt,
         "--extension",
