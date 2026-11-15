@@ -13,6 +13,8 @@ import {
 import {
   type AssistantTextSelector,
   captureAssistantTextSelection,
+  captureAssistantCitation,
+  resolveAssistantCitationRange,
   createAssistantTextSelector,
   findAssistantCitationText,
 } from "./assistantTextSelection";
@@ -65,6 +67,9 @@ class SelectionNode {
   }
   get length() {
     return this.data.length;
+  }
+  getAttribute(name: string) {
+    return this.attributes[name] ?? null;
   }
   get firstChild(): SelectionNode | null {
     return this.childNodes[0] ?? null;
@@ -198,6 +203,39 @@ function capture(viewport: SelectionNode, selection: Selection) {
 }
 
 describe("captureAssistantTextSelection", () => {
+  it("cites the selected readable text and refuses a different successful version", () => {
+    const text = textNode("Readable first. Selected words. Readable last.");
+    const source = assistantSource(text);
+    source.attributes["data-assistant-citation-rewrite"] = "success-request";
+    const viewport = new SelectionNode("DIV").append(source);
+    const captured = captureAssistantCitation(
+      viewport as unknown as HTMLElement,
+      nativeSelection([text, 16], [text, 30]),
+      { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") },
+    );
+    expect(captured?.citation).toMatchObject({
+      version: 2,
+      source: "rewrite",
+      rewriteRequestId: "success-request",
+      text: "Selected words",
+    });
+    if (!captured) throw new Error("Expected a selected citation");
+    source.attributes["data-assistant-citation-rewrite"] = "new-request";
+    expect(
+      resolveAssistantCitationRange(source as unknown as HTMLElement, captured.citation),
+    ).toBeNull();
+    delete source.attributes["data-assistant-citation-rewrite"];
+    const original = captureAssistantCitation(
+      viewport as unknown as HTMLElement,
+      nativeSelection([text, 16], [text, 30]),
+      { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") },
+    );
+    expect(original?.citation).toMatchObject({
+      version: 2,
+      source: "original",
+      text: "Selected words",
+    });
+  });
   it.each([
     { boundary: "next text", backwards: false },
     { boundary: "next block", backwards: false },

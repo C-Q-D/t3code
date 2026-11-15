@@ -2,7 +2,6 @@
 import { t } from "~/i18n";
 import {
   ASSISTANT_CITATION_MAX_TEXT_LENGTH,
-  MessageId,
   type AssistantCitation,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
@@ -10,7 +9,7 @@ import { QuoteIcon } from "lucide-react";
 import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  captureAssistantTextSelection,
+  captureAssistantCitation,
   type AssistantCitationSourceAnchor,
 } from "~/lib/assistantTextSelection";
 import {
@@ -75,9 +74,8 @@ export function AssistantSelectionToolbar({
     const clear = () => setSelection(null);
     const update = (pointer: SelectionActionPoint | null) => {
       const nativeSelection = window.getSelection();
-      const captured = captureAssistantTextSelection(viewport, nativeSelection);
-      const messageId = captured?.source.dataset.assistantCitationSource;
-      if (!captured || !messageId) {
+      const captured = captureAssistantCitation(viewport, nativeSelection, threadRef);
+      if (!captured) {
         clear();
         return;
       }
@@ -145,12 +143,7 @@ export function AssistantSelectionToolbar({
         );
       setSelection({
         sourceAnchor: { source: captured.source, range: captured.range, viewport },
-        citation: {
-          version: 1,
-          ...threadRef,
-          messageId: MessageId.make(messageId),
-          ...captured.selector,
-        },
+        citation: captured.citation,
         selectionTop: rect.top,
         position: resolveSelectionActionPosition({
           bounds: viewportRect,

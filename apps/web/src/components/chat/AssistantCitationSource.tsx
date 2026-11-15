@@ -340,6 +340,7 @@ export function AssistantCitationSource({
   itemKey,
   request,
   listRef,
+  rewriteRequestId,
   children,
 }: {
   messageId: MessageId;
@@ -347,6 +348,7 @@ export function AssistantCitationSource({
   itemKey: string;
   request: AssistantCitationTarget | null;
   listRef: RefObject<LegendListRef | null>;
+  rewriteRequestId?: string | undefined;
   children: ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -355,8 +357,14 @@ export function AssistantCitationSource({
     const root = rootRef.current;
     const list = listRef.current;
     if (!root || !list || !request || request.citation.messageId !== messageId) return;
+    const citation = request.citation;
+    const expected =
+      citation.version === 2 && citation.source === "rewrite"
+        ? citation.rewriteRequestId
+        : undefined;
+    if (expected !== rewriteRequestId) return;
     return observeAssistantCitationSource({ root, itemKey, request, list });
-  }, [itemKey, listRef, messageId, request]);
+  }, [itemKey, listRef, messageId, request, rewriteRequestId]);
 
   return (
     <div
@@ -364,6 +372,7 @@ export function AssistantCitationSource({
       data-assistant-citation-source={messageId}
       data-assistant-citation-environment={threadRef?.environmentId}
       data-assistant-citation-thread={threadRef?.threadId}
+      data-assistant-citation-rewrite={rewriteRequestId}
     >
       {children}
     </div>

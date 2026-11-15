@@ -3,6 +3,28 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
+  replyRewrite: {
+    cancel: "Cancel rewrite",
+    original: "Original",
+    readable: "Readable",
+    generate: "Make readable",
+    regenerate: "Regenerate",
+    refresh: "Refresh status",
+    submitting: "Submitting…",
+    autoEnabled: "Automatic rewriting enabled",
+    permissionRequired: "Requires permission to operate this environment.",
+    detailFailed: "Could not load rewrite status. Refresh before trying again.",
+    versionUnavailable: "This readable version is no longer available",
+    savedQuoteAvailable: "The selected text is still saved in the citation.",
+    status: {
+      queued: "Queued",
+      running: "Rewriting…",
+      succeeded: "Ready",
+      failed: "Failed. You can generate again.",
+      interrupted: "Outcome unknown. Refresh status before generating again.",
+      cancelled: "Cancelled",
+    },
+  },
   searchExcerpt: { user: "You:", agent: "Agent:" },
   sideTabStates: {
     approval: "needs approval",

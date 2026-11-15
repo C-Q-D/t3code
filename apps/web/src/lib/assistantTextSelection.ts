@@ -1,4 +1,9 @@
-import { ASSISTANT_CITATION_CONTEXT_LENGTH, type AssistantCitation } from "@t3tools/contracts";
+import {
+  ASSISTANT_CITATION_CONTEXT_LENGTH,
+  MessageId,
+  type AssistantCitation,
+  type ScopedThreadRef,
+} from "@t3tools/contracts";
 
 import { mathWrapperOf } from "../markdown-clipboard";
 
@@ -15,6 +20,26 @@ export type AssistantCitationSourceAnchor = {
   range: Range;
   viewport: HTMLElement;
 };
+
+/** Captures the actual rendered selection and its display version in one operation. */
+export function captureAssistantCitation(
+  viewport: HTMLElement,
+  selection: Selection | null,
+  threadRef: ScopedThreadRef,
+) {
+  const captured = captureAssistantTextSelection(viewport, selection);
+  const messageId = captured?.source.getAttribute("data-assistant-citation-source");
+  if (!captured || !messageId) return null;
+  const rewriteRequestId = captured.source.getAttribute("data-assistant-citation-rewrite");
+  const citation: AssistantCitation = {
+    version: 2,
+    ...threadRef,
+    messageId: MessageId.make(messageId),
+    ...captured.selector,
+    ...(rewriteRequestId ? { source: "rewrite", rewriteRequestId } : { source: "original" }),
+  };
+  return { ...captured, citation };
+}
 
 export function findAssistantCitationSourceAnchor(
   document: Document,
@@ -266,8 +291,14 @@ function rawTextOffset(text: string, normalizedOffset: number): number {
 
 export function resolveAssistantCitationRange(
   root: HTMLElement,
-  selector: AssistantTextSelector,
+  selector: AssistantTextSelector | AssistantCitation,
 ): Range | null {
+  if ("version" in selector) {
+    const requestId = root.getAttribute("data-assistant-citation-rewrite");
+    const expected =
+      selector.version === 2 && selector.source === "rewrite" ? selector.rewriteRequestId : null;
+    if (requestId !== expected) return null;
+  }
   if (excludedAncestor(root) !== null) return null;
   const stream = readAssistantText(root);
   const match = findAssistantCitationText(stream.text, selector);

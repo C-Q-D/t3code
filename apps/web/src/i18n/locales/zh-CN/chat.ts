@@ -2,6 +2,28 @@
 import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
+  replyRewrite: {
+    cancel: "取消改写",
+    original: "原文",
+    readable: "易读版",
+    generate: "生成易读版",
+    regenerate: "重新生成",
+    refresh: "刷新状态",
+    submitting: "正在提交…",
+    autoEnabled: "已开启自动改写",
+    permissionRequired: "需要此环境的对话操作权限。",
+    detailFailed: "无法获取改写状态。请先刷新状态再重试。",
+    versionUnavailable: "此易读版本已无法获取",
+    savedQuoteAvailable: "引用中仍保留你选择的文字。",
+    status: {
+      queued: "排队中",
+      running: "改写中…",
+      succeeded: "已完成",
+      failed: "改写失败，可重新生成。",
+      interrupted: "结果未知，请先刷新状态再重新生成。",
+      cancelled: "已取消",
+    },
+  },
   searchExcerpt: { user: "你：", agent: "Agent：" },
   sideTabStates: {
     approval: "需要批准",

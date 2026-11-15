@@ -25,6 +25,7 @@ import { formatChatTimestampTooltip, formatDayAwareTimestamp } from "../../times
 import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { TimelineRowCtx, TimelineRowActivityCtx, type TimelineRow } from "./timelineRowContext";
 import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts";
+import { ReplyRewriteResponse } from "./ReplyRewriteResponse";
 
 /** Renders one assistant row using the live text source, keeping streamed updates local to its content. */
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
@@ -35,12 +36,37 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
     row.projectedItem?.item.id,
   );
   const text = liveText ?? row.message.text;
-  const messageText = text || (row.message.streaming ? "" : t.chat.timeline.emptyResponse);
+  return (
+    <ReplyRewriteResponse row={row} sourceText={text}>
+      {(reading, controls) => (
+        <AssistantReplyContent
+          row={row}
+          messageText={reading.text || (row.message.streaming ? "" : t.chat.timeline.emptyResponse)}
+          rewriteRequestId={reading.rewriteRequestId}
+          controls={controls}
+        />
+      )}
+    </ReplyRewriteResponse>
+  );
+}
 
+function AssistantReplyContent({
+  row,
+  messageText,
+  rewriteRequestId,
+  controls,
+}: {
+  row: Extract<TimelineRow, { kind: "message" }>;
+  messageText: string;
+  rewriteRequestId?: string | undefined;
+  controls?: React.ReactNode;
+}) {
+  const ctx = use(TimelineRowCtx);
   return (
     <>
       <div className="relative min-w-0 px-1 py-0.5">
         <MessageAuthorHeading>{t.common.productName}</MessageAuthorHeading>
+        {controls}
         <div data-thread-find-text="true">
           <AssistantCitationSource
             messageId={row.message.id}
@@ -48,6 +74,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
             itemKey={row.id}
             request={ctx.citationRequest}
             listRef={ctx.listRef}
+            rewriteRequestId={rewriteRequestId}
           >
             <ChatMarkdown
               presentation="timeline"
@@ -80,6 +107,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
             message={row.message}
             showCopyButton={row.showAssistantCopyButton}
             copyStreaming={row.assistantCopyStreaming}
+            copyText={messageText}
           />
         ) : null}
       </div>
@@ -146,16 +174,21 @@ export function AssistantMetaTimelineRow({
   row: Extract<TimelineRow, { kind: "assistant-meta" }>;
 }) {
   return (
-    <div className="px-1">
-      <AssistantMessageMeta
-        className="mt-0.5"
-        projectedItem={row.projectedItem}
-        message={row.message}
-        showCopyButton={row.showAssistantCopyButton}
-        copyStreaming={row.assistantCopyStreaming}
-        alwaysVisible
-      />
-    </div>
+    <ReplyRewriteResponse row={row} sourceText={row.message.text}>
+      {(reading) => (
+        <div className="px-1">
+          <AssistantMessageMeta
+            className="mt-0.5"
+            projectedItem={row.projectedItem}
+            message={row.message}
+            showCopyButton={row.showAssistantCopyButton}
+            copyStreaming={row.assistantCopyStreaming}
+            copyText={reading.text}
+            alwaysVisible
+          />
+        </div>
+      )}
+    </ReplyRewriteResponse>
   );
 }
 
@@ -167,6 +200,7 @@ function AssistantMessageMeta({
   showCopyButton,
   copyStreaming,
   alwaysVisible = false,
+  copyText,
 }: {
   className?: string;
   projectedItem?: Extract<TimelineRow, { kind: "message" }>["projectedItem"];
@@ -174,6 +208,7 @@ function AssistantMessageMeta({
   showCopyButton: boolean;
   copyStreaming: boolean;
   alwaysVisible?: boolean;
+  copyText?: string | undefined;
 }) {
   const ctx = use(TimelineRowCtx);
 
@@ -199,6 +234,7 @@ function AssistantMessageMeta({
         message={message}
         showCopyButton={showCopyButton}
         streaming={copyStreaming}
+        copyText={copyText}
       />
       {!message.streaming && (
         <Tooltip>
@@ -225,13 +261,15 @@ function AssistantCopyButton({
   message,
   showCopyButton,
   streaming,
+  copyText,
 }: {
   message: ChatMessage;
   showCopyButton: boolean;
   streaming: boolean;
+  copyText?: string | undefined;
 }) {
   const assistantCopyState = resolveAssistantMessageCopyState({
-    text: message.text ?? null,
+    text: copyText ?? message.text ?? null,
     showCopyButton,
     streaming,
   });
