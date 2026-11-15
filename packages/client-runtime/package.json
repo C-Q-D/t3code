@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./state/reply-rewrite": {
+      "types": "./src/state/replyRewrite.ts",
+      "default": "./src/state/replyRewrite.ts"
+    },
     "./state/composerAssist": {
       "types": "./src/state/composerAssist.ts",
       "default": "./src/state/composerAssist.ts"
