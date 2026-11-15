@@ -4733,6 +4733,12 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       const messages = assistantMessages(harness.events);
       assert.strictEqual(messages.at(-1)?.message.text, expected);
       assert.strictEqual(messages.at(-1)?.message.streaming, false);
+      assert.deepEqual(
+        messages.at(-1)?.message.replyClassification,
+        reply === null
+          ? { kind: "unknown", source: "unknown" }
+          : { kind: "final", source: "codex_phase" },
+      );
       assert.strictEqual(new Set(messages.map(({ message }) => message.id)).size, 1);
       // Image bytes stay with Codex; clients load the saved file.
       assert.notInclude(encodeUnknownJson(harness.events), result);
@@ -4858,6 +4864,10 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           assert.isAbove(finished, projectedBoth);
           assert.strictEqual(messages.at(-1)?.message.id, messages[0]?.message.id);
           assert.strictEqual(messages.at(-1)?.message.streaming, false);
+          assert.deepEqual(messages.at(-1)?.message.replyClassification, {
+            kind: "final",
+            source: "codex_phase",
+          });
         }
       }).pipe(
         Effect.scoped,
