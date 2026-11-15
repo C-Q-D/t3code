@@ -95,8 +95,13 @@ export function createReplyRewriteEnvironmentAtoms<R, E>(
         if (!get(permissions.permissionAtom(environmentId)))
           return Stream.succeed({ ...initial, allowed: false });
         let current = { ...initial, allowed: true };
-        const events = subscribeDynamic(REPLY_REWRITE_WS_METHODS.subscribe, () =>
-          Effect.sync(() => ({ threadId, afterRevision: current.revision })),
+        const events = subscribeDynamic(
+          REPLY_REWRITE_WS_METHODS.subscribe,
+          () => Effect.sync(() => ({ threadId, afterRevision: current.revision })),
+          {
+            onExpectedFailure: () => Effect.void,
+            retryExpectedFailureAfter: "250 millis",
+          },
         ).pipe(
           Stream.filter(
             (event) => event.threadId === threadId && event.revision > current.revision,

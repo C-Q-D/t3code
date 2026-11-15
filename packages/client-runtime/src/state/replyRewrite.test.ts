@@ -7,6 +7,7 @@ import {
   EnvironmentId,
   MessageId,
   REPLY_REWRITE_WS_METHODS,
+  ReplyRewriteError,
   RunId,
   ThreadId,
   type AuthSessionState,
@@ -23,6 +24,7 @@ import * as TestClock from "effect/testing/TestClock";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
+import * as Schema from "effect/Schema";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 import { EnvironmentRegistry } from "../connection/registry.ts";
@@ -171,6 +173,7 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
     input: ReplyRewriteSubscribeInput;
   }>();
   const closed = yield* Queue.unbounded<{ environmentId: EnvironmentId; threadId: ThreadId }>();
+  const delivered = yield* Queue.unbounded<number>();
   const subscriptions: { environmentId: EnvironmentId; input: ReplyRewriteSubscribeInput }[] = [];
   const reads: { environmentId: EnvironmentId; input: typeof target }[] = [];
   const environments = new Map<
@@ -181,7 +184,10 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
       disconnect: Effect.Effect<void>;
       records: Map<MessageId, ReplyRewriteRecord>;
       history: ReplyRewriteChange[];
-      listeners: Set<{ threadId: ThreadId; events: Queue.Queue<ReplyRewriteChange> }>;
+      listeners: Set<{
+        threadId: ThreadId;
+        events: Queue.Queue<ReplyRewriteChange | ReplyRewriteError>;
+      }>;
     }
   >();
   for (const environmentId of [env, EnvironmentId.make("other")]) {
@@ -202,7 +208,10 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
     );
     const records = new Map<MessageId, ReplyRewriteRecord>();
     const history: ReplyRewriteChange[] = [];
-    const listeners = new Set<{ threadId: ThreadId; events: Queue.Queue<ReplyRewriteChange> }>();
+    const listeners = new Set<{
+      threadId: ThreadId;
+      events: Queue.Queue<ReplyRewriteChange | ReplyRewriteError>;
+    }>();
     const client = {
       [REPLY_REWRITE_WS_METHODS.getDetail]: (input: typeof target) =>
         Effect.sync(() => {
@@ -212,7 +221,7 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
       [REPLY_REWRITE_WS_METHODS.subscribe]: (input: ReplyRewriteSubscribeInput) =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const events = yield* Queue.unbounded<ReplyRewriteChange>();
+            const events = yield* Queue.unbounded<ReplyRewriteChange | ReplyRewriteError>();
             const listener = { threadId: input.threadId, events };
             listeners.add(listener);
             yield* Effect.addFinalizer(() =>
@@ -229,7 +238,24 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
                 (event) =>
                   event.threadId === input.threadId && event.revision > input.afterRevision,
               ),
-            ).pipe(Stream.concat(Stream.fromQueue(events)));
+            ).pipe(
+              Stream.concat(
+                Stream.fromQueue(events).pipe(
+                  Stream.mapEffect((event) =>
+                    Schema.is(ReplyRewriteError)(event)
+                      ? Effect.fail(event)
+                      : Effect.succeed(event),
+                  ),
+                ),
+              ),
+              Stream.flatMap((event) =>
+                Stream.succeed(event).pipe(
+                  Stream.concat(
+                    Stream.fromEffect(Queue.offer(delivered, event.revision)).pipe(Stream.drain),
+                  ),
+                ),
+              ),
+            );
           }),
         ),
     };
@@ -316,6 +342,7 @@ const notificationHarness = Effect.fn("ReplyRewriteTest.notifications")(function
     detail,
     opened,
     closed,
+    delivered,
     reads,
     subscriptions,
     publish,
@@ -488,9 +515,9 @@ it.effect(
     ),
 );
 
-it.effect(
-  "reconnects from the processed maximum revision and reads changes made while disconnected",
-  () =>
+it.effect.each([false, true])(
+  "reconnects from the processed maximum revision after subscription failure=%s",
+  (failSubscription) =>
     Effect.scoped(
       Effect.gen(function* () {
         const h = yield* notificationHarness();
@@ -506,8 +533,16 @@ it.effect(
         );
         yield* h.publish(8, completed("before-offline"));
         yield* Deferred.await(first);
+        if (failSubscription) {
+          for (const listener of h.forEnvironment(env).listeners)
+            yield* Queue.offer(
+              listener.events,
+              new ReplyRewriteError({ code: "protocol", message: "Temporary read failure" }),
+            );
+          yield* Queue.take(h.closed);
+        }
         yield* h.forEnvironment(env).disconnect;
-        yield* Queue.take(h.closed);
+        if (!failSubscription) yield* Queue.take(h.closed);
         yield* h.publish(19, completed("while-offline"));
         const caughtUp = yield* watchReply(
           h.registry,
@@ -515,6 +550,10 @@ it.effect(
           (value) => value?.lastSuccess?.requestId === "while-offline",
         );
         yield* h.forEnvironment(env).connect;
+        if (failSubscription) {
+          yield* Deferred.await(caughtUp);
+          expect(h.subscriptions).toHaveLength(2);
+        }
         expect((yield* Queue.take(h.opened)).input).toEqual({
           threadId: target.threadId,
           afterRevision: 8,
@@ -527,6 +566,11 @@ it.effect(
         );
         yield* h.publish(33, completed("after-reconnect"));
         yield* Deferred.await(latest);
+        yield* Stream.fromQueue(h.delivered).pipe(
+          Stream.filter((revision) => revision === 33),
+          Stream.take(1),
+          Stream.runDrain,
+        );
         yield* h.forEnvironment(env).disconnect;
         yield* Queue.take(h.closed);
         yield* h.forEnvironment(env).connect;
