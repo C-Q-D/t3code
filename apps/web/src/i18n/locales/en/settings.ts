@@ -17,6 +17,35 @@ import type {
 import type { ThemeColorRole } from "@t3tools/shared/themePalettes";
 
 export const settings = {
+  replyRewrite: {
+    required: "Enter a value. The saved setting has been retained.",
+    title: "Readable Codex replies",
+    auto: "Automatically rewrite final replies",
+    description:
+      "Off by default. Uses this environment's independent Pi settings after a successful Codex run. Originals remain in conversation context.",
+    fields: {
+      binaryPath: "Rewrite Pi executable",
+      provider: "Rewrite provider",
+      modelId: "Rewrite model",
+      thinkingLevel: "Rewrite thinking level",
+    },
+    binaryPermission:
+      "Changing the executable requires provider management permission on the selected environment.",
+    tier: "Requested rewrite service tier",
+    tierDescription:
+      "Priority is requested, but the actual tier can be default or unknown. It does not guarantee faster replies.",
+    prompt: "Rewrite expression requirements",
+    promptDescription:
+      "Optional wording requirements. Leave empty to use the default. The service always applies its fidelity constraints. Changes apply to new requests.",
+    defaultPrompt: "Empty uses the service's default expression requirements.",
+    mixed: "Different values across selected environments",
+    save: "Save requirements",
+    reset: "Use default requirements",
+    reload: "Reload saved value",
+    conflict: "The saved requirements changed while you were editing. Reload before saving.",
+    saving: "Saving…",
+    saved: "Saved for the selected environments.",
+  },
   backgroundProfileLabels: {
     balanced: "Balanced",
     performance: "Performance",

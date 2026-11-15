@@ -64,7 +64,7 @@ function useRunScopedPlan() {
       onFailed?.();
       return;
     }
-    void persistScopedSettingsPatch(
+    return persistScopedSettingsPatch(
       plan,
       async (request) => {
         const missing = requiredScopesForServerSettingsPatch(request.input.patch).find(
@@ -108,7 +108,10 @@ export function useUpdateScopedSettings() {
   const { scope, environments } = useSettingsScope();
   const run = useRunScopedPlan();
   /** `onFailed` runs when any target rejects or drops the patch, so a draft can fall back. */
-  return (patch: ScopedSettingsPatch, options?: { readonly onFailed?: () => void }) =>
+  return (
+    patch: ScopedSettingsPatch,
+    options?: { readonly onFailed?: () => void },
+  ): Promise<void> | void =>
     run(planScopedSettingsPatch(scope, environments, patch), options?.onFailed);
 }
 

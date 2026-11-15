@@ -99,6 +99,7 @@ import { searchableSetting } from "./settingsSearch";
 import { IDLE_COMPACTION_MODES, globalIdleCompaction } from "@t3tools/contracts";
 import { scopedIdleCompaction } from "./scopedSettings";
 import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
+import { ReplyRewriteSettings } from "./ReplyRewriteSettings";
 import { BackgroundActivitySettingsRow } from "./BackgroundActivitySettings";
 
 const RESPONSE_STREAMING_MODE_LABELS = t.settings.rows.responseStreaming.options;
@@ -2074,6 +2075,8 @@ export function GeneralSettingsPanel() {
         />
         <ThreadTitleInstructionsSettings />
       </SettingsSection>
+
+      <ReplyRewriteSettings />
 
       <SettingsSection id="about" title={t.settings.sections.about}>
         {isElectron || HOSTED_APP_CHANNEL ? (

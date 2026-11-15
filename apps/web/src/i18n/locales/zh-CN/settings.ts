@@ -2,6 +2,33 @@
 import type { Messages } from "../en";
 
 export const settings: Messages["settings"] = {
+  replyRewrite: {
+    required: "此项不能为空，已保留原设置。",
+    title: "Codex 易读回复",
+    auto: "自动改写最终回复",
+    description:
+      "默认关闭。Codex 对话成功后，使用此环境的独立 Pi 配置改写。对话上下文始终保留原文。",
+    fields: {
+      binaryPath: "改写用 Pi 执行文件",
+      provider: "改写提供方",
+      modelId: "改写模型",
+      thinkingLevel: "改写思考等级",
+    },
+    binaryPermission: "修改执行文件需要所选环境的提供方管理权限。",
+    tier: "改写请求服务等级",
+    tierDescription: "请求 priority，但实际可能为 default 或未知，不保证回复更快。",
+    prompt: "改写表达要求",
+    promptDescription:
+      "可填写表达方式要求，留空使用默认要求。服务始终执行固定保真约束。修改仅用于新请求。",
+    defaultPrompt: "留空使用服务默认的表达要求。",
+    mixed: "所选环境的值不同",
+    save: "保存表达要求",
+    reset: "使用默认要求",
+    reload: "重新载入已保存值",
+    conflict: "编辑期间已保存的要求发生变化，请重新载入后再保存。",
+    saving: "正在保存…",
+    saved: "已保存到所选环境。",
+  },
   backgroundProfileLabels: {
     balanced: "均衡",
     performance: "性能优先",

@@ -242,6 +242,43 @@ describe("scoped settings writes", () => {
     expect(persistClient).not.toHaveBeenCalled();
   });
 
+  it("saves rewrite wording on the destination while retaining its independent model and executable", async () => {
+    const selected = environment("Rewrite target", {
+      settings: {
+        replyRewrite: {
+          ...DEFAULT_SERVER_SETTINGS.replyRewrite,
+          modelId: "custom-model",
+          binaryPath: "custom-pi",
+          auto: true,
+        },
+      },
+    });
+    if (!selected.serverConfig) throw new Error("Expected destination settings");
+    let saved = selected.serverConfig.settings;
+    const targets = [laptop, selected];
+    const scope = resolveSettingsScope({ machine: selected.environmentId }, [], targets);
+    const persistClient = vi.fn();
+    const outcome = await persistScopedSettingsPatch(
+      planScopedSettingsPatch(scope, targets, {
+        replyRewrite: { customPrompt: "  Keep this wording.\nAnd this line.  " },
+      }),
+      async ({ environmentId, input }) => {
+        expect(environmentId).toBe(selected.environmentId);
+        saved = applyServerSettingsPatch(saved, input.patch);
+        return { _tag: "Success", value: saved };
+      },
+      persistClient,
+    );
+    expect(outcome.failedEnvironments).toEqual([]);
+    expect(saved.replyRewrite).toMatchObject({
+      modelId: "custom-model",
+      binaryPath: "custom-pi",
+      auto: true,
+      customPrompt: "  Keep this wording.\nAnd this line.  ",
+    });
+    expect(persistClient).not.toHaveBeenCalled();
+  });
+
   describe("an environment that saves but drops keys it does not know", () => {
     const upgradedLaptop = (saved: Partial<ServerSettings>) =>
       vi.fn(async ({ environmentId }: { environmentId: EnvironmentId }) => ({
