@@ -78,6 +78,34 @@ describe("runMigrations", () => {
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
 
+  it.effect(
+    "upgrades rewrite receipts without restoring an older generation's source identity",
+    () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* runMigrations({ toMigrationInclusive: 82 });
+        yield* sql`INSERT INTO reply_rewrites(message_id, thread_id, run_id, source_hash, generation, attempt_json, success_json, updated_at)
+        VALUES ('message', 'thread', 'run', 'hash', 2, '{}', '{"text":"saved"}', '1970-01-01T00:00:00.000Z')`;
+        yield* sql`INSERT INTO reply_rewrite_requests(request_id, message_id, thread_id, run_id, generation)
+        VALUES ('old', 'message', 'thread', 'run', 1), ('current', 'message', 'thread', 'run', 2)`;
+        yield* runMigrations();
+        const records = yield* sql<{
+          source_version: number;
+          success_json: string;
+        }>`SELECT source_version, success_json FROM reply_rewrites`;
+        assert.deepStrictEqual(records, [{ source_version: 2, success_json: '{"text":"saved"}' }]);
+        const receipts = yield* sql<{
+          request_id: string;
+          source_version: number;
+        }>`SELECT request_id, source_version FROM reply_rewrite_requests ORDER BY generation`;
+        assert.deepStrictEqual(receipts, [
+          { request_id: "old", source_version: 1 },
+          { request_id: "current", source_version: 2 },
+        ]);
+        assert.deepStrictEqual(yield* runMigrations(), []);
+      }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+  );
+
   it.effect.each([30, 54])("still starts with a site-local migration at id %s", (id) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

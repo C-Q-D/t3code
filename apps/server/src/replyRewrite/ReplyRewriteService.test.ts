@@ -639,6 +639,127 @@ it.effect(
 );
 
 it.effect(
+  "versions automatic sources across A to B to A without blocking source commits or accepting old calls",
+  () =>
+    Effect.gen(function* () {
+      const controlled = yield* makeControlledRunner;
+      yield* Effect.gen(function* () {
+        const fixture = yield* seed({ classification: { kind: "final", source: "codex_phase" } });
+        const service = yield* Service.ReplyRewriteService;
+        const outbox = yield* Outbox.EffectOutboxV2;
+        yield* (yield* Settings.ServerSettingsService).updateSettings({
+          replyRewrite: { auto: true },
+        });
+        const writeText = (text: string) =>
+          fixture.sink.write({
+            events: [
+              fixture.event({ type: "message.updated", payload: { ...fixture.message, text } }),
+            ],
+          });
+        yield* writeText("A");
+        const first = yield* service.getDetail(fixture.target);
+        const oldClaim = yield* outbox.claimNext({
+          workerId: "old-A",
+          workerGroup: "reply-rewrite",
+        });
+        assert(Option.isSome(oldClaim));
+        const oldJob = yield* service.execute(oldClaim.value).pipe(Effect.forkScoped);
+        const oldCall = yield* Queue.take(controlled.calls);
+        yield* writeText("B");
+        yield* writeText("A");
+        const current = yield* service.getDetail(fixture.target);
+        assert.equal(current?.currentAttempt?.generation, 3);
+        assert.notEqual(current?.currentAttempt?.requestId, first?.currentAttempt?.requestId);
+        assert.equal(
+          (yield* (yield* ProjectionStore.ProjectionStoreV2).getThreadProjection(
+            fixture.target.threadId,
+          )).messages.find((m) => m.id === fixture.message.id)?.text,
+          "A",
+        );
+        const restored = yield* outbox.claimNext({
+          workerId: "restored-A",
+          workerGroup: "reply-rewrite",
+        });
+        assert(Option.isSome(restored));
+        const newJob = yield* service.execute(restored.value).pipe(Effect.forkScoped);
+        const newCall = yield* Queue.take(controlled.calls);
+        assert.equal(newCall.input.sourceText, "A");
+        yield* Deferred.succeed(newCall.result, output("New A."));
+        yield* Fiber.join(newJob);
+        yield* outbox.succeed({ effectId: restored.value.id, workerId: "restored-A" });
+        yield* Deferred.succeed(oldCall.result, output("Old A."));
+        yield* Fiber.join(oldJob);
+        assert.equal((yield* service.getDetail(fixture.target))?.lastSuccess?.text, "New A.");
+        const stale = yield* service
+          .request({ ...fixture.target, requestId: first!.currentAttempt!.requestId })
+          .pipe(Effect.flip);
+        assert.equal(isReplyRewriteError(stale) ? stale.code : "unexpected", "source_changed");
+        yield* writeText("A");
+        assert.equal((yield* service.getDetail(fixture.target))?.currentAttempt?.generation, 3);
+        assert.equal(yield* (yield* Worker.ReplyRewriteWorker).drain, 0);
+      }).pipe(Effect.provide(testLayer(controlled.runner)));
+    }),
+);
+
+it.effect.each(["classification", "run"] as const)(
+  "versions restored identical bytes after source %s invalidation",
+  (invalidation) =>
+    Effect.gen(function* () {
+      const controlled = yield* makeControlledRunner;
+      yield* Effect.gen(function* () {
+        const fixture = yield* seed({ classification: { kind: "final", source: "codex_phase" } });
+        const service = yield* Service.ReplyRewriteService;
+        yield* (yield* Settings.ServerSettingsService).updateSettings({
+          replyRewrite: { auto: true },
+        });
+        yield* fixture.sink.write({
+          events: [fixture.event({ type: "message.updated", payload: fixture.message })],
+        });
+        const first = yield* service.getDetail(fixture.target);
+        yield* fixture.sink.write({
+          events: [
+            invalidation === "classification"
+              ? fixture.event({
+                  type: "message.updated",
+                  payload: {
+                    ...fixture.message,
+                    replyClassification: { kind: "commentary", source: "codex_phase" },
+                  },
+                })
+              : fixture.event({
+                  type: "run.updated",
+                  payload: { ...fixture.run, status: "rolled_back" },
+                }),
+          ],
+        });
+        assert.isNull(yield* service.getDetail(fixture.target));
+        yield* fixture.sink.write({
+          events: [
+            invalidation === "classification"
+              ? fixture.event({ type: "message.updated", payload: fixture.message })
+              : fixture.event({ type: "run.updated", payload: fixture.run }),
+          ],
+        });
+        const restored = yield* service.getDetail(fixture.target);
+        assert.equal(restored?.target.sourceHash, first?.target.sourceHash);
+        assert.equal(restored?.currentAttempt?.generation, 2);
+        assert.notEqual(restored?.currentAttempt?.requestId, first?.currentAttempt?.requestId);
+        const stale = yield* service
+          .request({ ...fixture.target, requestId: first!.currentAttempt!.requestId })
+          .pipe(Effect.flip);
+        assert.equal(isReplyRewriteError(stale) ? stale.code : "unexpected", "source_changed");
+        const worker = yield* Worker.ReplyRewriteWorker;
+        const job = yield* worker.runOnce.pipe(Effect.forkScoped);
+        const call = yield* Queue.take(controlled.calls);
+        assert.equal(call.input.sourceText, fixture.message.text);
+        yield* Deferred.succeed(call.result, output());
+        yield* Fiber.join(job);
+        assert.equal(yield* worker.drain, 0);
+      }).pipe(Effect.provide(testLayer(controlled.runner)));
+    }),
+);
+
+it.effect(
   "accepts a final persisted after completion and cancels it before the external call when its source changes",
   () =>
     Effect.gen(function* () {

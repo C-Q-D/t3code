@@ -44,6 +44,7 @@ type RewriteRow = {
   thread_id: string;
   run_id: string;
   source_hash: string;
+  source_version: number;
   generation: number;
   attempt_json: string;
   success_json: string | null;
@@ -62,6 +63,17 @@ const encodeAttempt = Schema.encodeSync(Schema.fromJsonString(ReplyRewriteAttemp
 const decodeAttempt = Schema.decodeUnknownSync(Schema.fromJsonString(ReplyRewriteAttempt));
 const encodeSuccess = Schema.encodeSync(Schema.fromJsonString(ReplyRewriteSuccess));
 const decodeSuccess = Schema.decodeUnknownSync(Schema.fromJsonString(ReplyRewriteSuccess));
+const sourceVersion = (row: RewriteRow | null, sourceHash: string) => {
+  if (row === null) return 1;
+  const attempt = decodeAttempt(row.attempt_json);
+  return (
+    row.source_version +
+    (row.source_hash !== sourceHash ||
+    (attempt.status === "cancelled" && attempt.error?.code === "source_changed")
+      ? 1
+      : 0)
+  );
+};
 const recordOf = (row: RewriteRow): ReplyRewriteRecord => ({
   target: {
     threadId: ThreadId.make(row.thread_id),
@@ -164,12 +176,16 @@ const make = Effect.gen(function* () {
       : { ...row, sourceHash: hash(row.text) };
   }, Effect.catch(storageError));
 
-  const read = Effect.fn("ReplyRewrite.read")(function* (input: ReplyRewriteTargetInput) {
+  const readRow = Effect.fn("ReplyRewrite.readRow")(function* (input: ReplyRewriteTargetInput) {
     const rows =
       yield* sql<RewriteRow>`SELECT * FROM reply_rewrites WHERE message_id = ${input.messageId}
       AND thread_id = ${input.threadId} AND run_id = ${input.runId}`;
-    return rows[0] === undefined ? null : recordOf(rows[0]);
+    return rows[0] ?? null;
   }, Effect.catch(storageError));
+  const read = Effect.fn("ReplyRewrite.read")(function* (input: ReplyRewriteTargetInput) {
+    const row = yield* readRow(input);
+    return row === null ? null : recordOf(row);
+  });
 
   const changed = Effect.fn("ReplyRewrite.changed")(function* (input: ReplyRewriteTargetInput) {
     // A client needs the latest invalidation per reply, not every intermediate status.
@@ -196,6 +212,7 @@ const make = Effect.gen(function* () {
       thread_id: string;
       run_id: string;
       message_id: string;
+      source_version: number;
     }>`SELECT * FROM reply_rewrite_requests WHERE request_id = ${input.requestId}`;
     const receipt = receipts[0];
     if (
@@ -209,9 +226,11 @@ const make = Effect.gen(function* () {
         message: "This request ID belongs to another reply.",
       });
     }
-    const previous = yield* read(input);
+    const previousRow = yield* readRow(input);
+    const version = sourceVersion(previousRow, original.sourceHash);
+    const previous = previousRow === null ? null : recordOf(previousRow);
     if (receipt !== undefined && previous !== null) {
-      if (previous.target.sourceHash !== original.sourceHash)
+      if (receipt.source_version !== version)
         return yield* new ReplyRewriteError({
           code: "source_changed",
           message: "The source reply changed after this request was accepted.",
@@ -226,8 +245,8 @@ const make = Effect.gen(function* () {
       previous?.target.sourceHash === original.sourceHash &&
       (current.status === "queued" || current.status === "running")
     ) {
-      yield* sql`INSERT INTO reply_rewrite_requests(request_id, thread_id, run_id, message_id, generation)
-        VALUES (${input.requestId}, ${input.threadId}, ${input.runId}, ${input.messageId}, ${current.generation})`;
+      yield* sql`INSERT INTO reply_rewrite_requests(request_id, thread_id, run_id, message_id, generation, source_version)
+        VALUES (${input.requestId}, ${input.threadId}, ${input.runId}, ${input.messageId}, ${current.generation}, ${version})`;
       return previous;
     }
     if (Option.isNone(runner))
@@ -267,13 +286,13 @@ const make = Effect.gen(function* () {
       finishedAt: null,
       error: null,
     };
-    yield* sql`INSERT INTO reply_rewrites(message_id, thread_id, run_id, source_hash, generation, attempt_json, success_json, updated_at)
-      VALUES (${input.messageId}, ${input.threadId}, ${input.runId}, ${original.sourceHash}, ${generation}, ${encodeAttempt(attempt)}, NULL, ${requestedAt})
-      ON CONFLICT(message_id) DO UPDATE SET source_hash = excluded.source_hash, generation = excluded.generation,
+    yield* sql`INSERT INTO reply_rewrites(message_id, thread_id, run_id, source_hash, source_version, generation, attempt_json, success_json, updated_at)
+      VALUES (${input.messageId}, ${input.threadId}, ${input.runId}, ${original.sourceHash}, ${version}, ${generation}, ${encodeAttempt(attempt)}, NULL, ${requestedAt})
+      ON CONFLICT(message_id) DO UPDATE SET source_hash = excluded.source_hash, source_version = excluded.source_version, generation = excluded.generation,
         attempt_json = excluded.attempt_json, updated_at = excluded.updated_at,
         success_json = CASE WHEN reply_rewrites.source_hash = excluded.source_hash THEN reply_rewrites.success_json ELSE NULL END`;
-    yield* sql`INSERT INTO reply_rewrite_requests(request_id, thread_id, run_id, message_id, generation)
-      VALUES (${input.requestId}, ${input.threadId}, ${input.runId}, ${input.messageId}, ${generation})`;
+    yield* sql`INSERT INTO reply_rewrite_requests(request_id, thread_id, run_id, message_id, generation, source_version)
+      VALUES (${input.requestId}, ${input.threadId}, ${input.runId}, ${input.messageId}, ${generation}, ${version})`;
     yield* outbox.enqueue([
       {
         id: jobId(input.requestId),
@@ -380,15 +399,17 @@ const make = Effect.gen(function* () {
         for (const message of messages) {
           const target = { ...run, messageId: MessageId.make(message.message_id) };
           const original = yield* source(target);
-          if (original !== null)
+          if (original !== null) {
+            const version = sourceVersion(yield* readRow(target), original.sourceHash);
             yield* accept(
               {
                 ...target,
-                requestId: `auto:${hash(encodeJson([run.runId, target.messageId, original.sourceHash]))}`,
+                requestId: `auto:${hash(encodeJson([run.runId, target.messageId, original.sourceHash, version]))}`,
               },
               config,
               true,
             );
+          }
         }
       }
     },
