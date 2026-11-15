@@ -42,7 +42,7 @@ export const settings = {
     save: "Save requirements",
     reset: "Use default requirements",
     reload: "Reload saved value",
-    conflict: "The saved requirements changed while you were editing. Reload before saving.",
+    conflict: "This setting changed while you were editing. Reload before saving.",
     saving: "Saving…",
     saved: "Saved for the selected environments.",
   },

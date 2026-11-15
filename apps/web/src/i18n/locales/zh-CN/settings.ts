@@ -25,7 +25,7 @@ export const settings: Messages["settings"] = {
     save: "保存表达要求",
     reset: "使用默认要求",
     reload: "重新载入已保存值",
-    conflict: "编辑期间已保存的要求发生变化，请重新载入后再保存。",
+    conflict: "编辑期间此设置已在其他位置改变，请重新载入后再保存。",
     saving: "正在保存…",
     saved: "已保存到所选环境。",
   },

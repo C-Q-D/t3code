@@ -19,13 +19,15 @@ import {
 } from "./useScopedSettings";
 
 const TEXT_FIELDS = ["binaryPath", "provider", "modelId", "thinkingLevel"] as const;
+type TextField = (typeof TEXT_FIELDS)[number];
+type Draft = { text: string; base: ReadonlyMap<string, string> };
+const conflictsWith = (draft: Draft | null, values: ReadonlyMap<string, string>) =>
+  draft !== null && [...values].some(([id, value]) => draft.base.get(id) !== value);
 
 export function ReplyRewriteSettings() {
-  const { scope, targets } = useSettingsScope();
+  const { scope, search } = useSettingsScope();
   if (scope.kind === "project" || scope.kind === "checkout") return null;
-  return (
-    <ReplyRewriteSettingsEditor key={targets.map((target) => target.environmentId).join(",")} />
-  );
+  return <ReplyRewriteSettingsEditor key={JSON.stringify(search.machine ?? null)} />;
 }
 
 function ReplyRewriteSettingsEditor() {
@@ -37,17 +39,19 @@ function ReplyRewriteSettingsEditor() {
   const binaryAllowed =
     connectedEnvironments.length > 0 &&
     connectedEnvironments.every((environment) => providerGrants.has(environment.environmentId));
-  const [draft, setDraft] = useState<{ text: string; base: readonly string[] } | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const promptValues = targets.map((target) => target.settings.replyRewrite.customPrompt);
+  const promptBase = new Map(
+    targets.map((target) => [target.environmentId, target.settings.replyRewrite.customPrompt]),
+  );
   const promptMixed = promptValues.some((value) => value !== promptValues[0]);
   const autoMixed = targets.some((target) => target.settings.replyRewrite.auto !== settings.auto);
   const tierMixed = targets.some(
     (target) => target.settings.replyRewrite.requestedServiceTier !== settings.requestedServiceTier,
   );
-  const conflict =
-    draft !== null && draft.base.some((value, index) => value !== promptValues[index]);
+  const conflict = conflictsWith(draft, promptBase);
   const save = async (patch: ReplyRewriteSettingsPatch) => {
     setSaving(true);
     setSaved(false);
@@ -87,46 +91,13 @@ function ReplyRewriteSettingsEditor() {
           />
         }
       />
-      {TEXT_FIELDS.map((field) => {
-        const values = targets.map((target) => target.settings.replyRewrite[field]);
-        const mixed = values.some((value) => value !== values[0]);
-        const allowed = field === "binaryPath" ? binaryAllowed : settingsAllowed;
-        return (
-          <SettingsRow
-            key={field}
-            mixed={mixed}
-            {...searchableSetting(`reply-rewrite-${field}`)}
-            description={
-              field === "binaryPath" ? t.settings.replyRewrite.binaryPermission : undefined
-            }
-            control={
-              <div className="w-64 max-w-full">
-                <Input
-                  key={`${field}:${values.join("\u0000")}`}
-                  size="sm"
-                  aria-label={t.settings.replyRewrite.fields[field]}
-                  disabled={!allowed}
-                  defaultValue={mixed ? "" : settings[field]}
-                  placeholder={mixed ? t.settings.replyRewrite.mixed : undefined}
-                  onBlur={(event) => {
-                    const value = event.target.value.trim();
-                    if (!value) {
-                      event.target.value = mixed ? "" : settings[field];
-                      toastManager.add({
-                        type: "warning",
-                        title: t.settings.replyRewrite.required,
-                      });
-                      return;
-                    }
-                    if (value && (mixed || value !== settings[field]))
-                      updateSettings({ replyRewrite: { [field]: value } });
-                  }}
-                />
-              </div>
-            }
-          />
-        );
-      })}
+      {TEXT_FIELDS.map((field) => (
+        <ReplyRewriteTextSetting
+          key={field}
+          field={field}
+          allowed={field === "binaryPath" ? binaryAllowed : settingsAllowed}
+        />
+      ))}
       <SettingsRow
         serverScoped
         settingKeys={["replyRewrite"]}
@@ -169,7 +140,7 @@ function ReplyRewriteSettingsEditor() {
             }
             onChange={(event) => {
               setSaved(false);
-              setDraft({ text: event.target.value, base: draft?.base ?? promptValues });
+              setDraft({ text: event.target.value, base: draft?.base ?? promptBase });
             }}
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -206,5 +177,80 @@ function ReplyRewriteSettingsEditor() {
         </div>
       </SettingsRow>
     </SettingsSection>
+  );
+}
+
+function ReplyRewriteTextSetting({ field, allowed }: { field: TextField; allowed: boolean }) {
+  const { targets } = useSettingsScope();
+  const settings = useScopedSettings((settings) => settings.replyRewrite);
+  const updateSettings = useUpdateScopedSettings();
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const values = new Map(
+    targets.map((target) => [target.environmentId, target.settings.replyRewrite[field]]),
+  );
+  const mixed = [...values.values()].some((value) => value !== settings[field]);
+  const conflict = conflictsWith(draft, values);
+  const saved = mixed ? "" : settings[field];
+  const save = async () => {
+    if (!draft || !allowed || saving || conflict) return;
+    const value = draft.text.trim();
+    if (!value) {
+      toastManager.add({ type: "warning", title: t.settings.replyRewrite.required });
+      return;
+    }
+    if (!mixed && value === saved) {
+      setDraft(null);
+      return;
+    }
+    setSaving(true);
+    let failed = false;
+    try {
+      await updateSettings(
+        { replyRewrite: { [field]: value } },
+        {
+          onFailed: () => {
+            failed = true;
+          },
+        },
+      );
+      if (!failed) setDraft(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <SettingsRow
+      mixed={mixed}
+      {...searchableSetting(`reply-rewrite-${field}`)}
+      description={field === "binaryPath" ? t.settings.replyRewrite.binaryPermission : undefined}
+      control={
+        <div className="w-64 max-w-full">
+          <Input
+            size="sm"
+            aria-label={t.settings.replyRewrite.fields[field]}
+            disabled={!allowed || saving}
+            value={draft?.text ?? saved}
+            placeholder={mixed ? t.settings.replyRewrite.mixed : undefined}
+            onFocus={() => setDraft((current) => current ?? { text: saved, base: values })}
+            onChange={(event) =>
+              setDraft({ text: event.target.value, base: draft?.base ?? values })
+            }
+            onBlur={() => void save()}
+          />
+        </div>
+      }
+    >
+      {conflict ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="status" className="text-xs text-muted-foreground">
+            {t.settings.replyRewrite.conflict}
+          </p>
+          <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
+            {t.settings.replyRewrite.reload}
+          </Button>
+        </div>
+      ) : null}
+    </SettingsRow>
   );
 }
