@@ -55,9 +55,13 @@ vi.mock("~/state/composerAssist", () => ({
 function Harness({
   thread = "thread",
   options,
+  onSend,
+  rewrite,
 }: {
   thread?: string;
   options?: Partial<ComposerPromptOptimizerInput>;
+  onSend?: (prompt: string) => void;
+  rewrite?: Parameters<typeof ComposerAssistPopover>[0]["rewrite"];
 }) {
   const [prompt, setPrompt] = useState("  fix the bug  ");
   const [cursor, setCursor] = useState(15);
@@ -84,7 +88,11 @@ function Harness({
     run: optimizer.trigger,
   });
   return (
-    <div
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSend?.(prompt);
+      }}
       onKeyDown={(event) => {
         const command = resolveChatShortcutCommand(
           event.nativeEvent,
@@ -108,11 +116,11 @@ function Harness({
       }}
     >
       {paletteAction ? (
-        <button role="menuitem" onClick={() => void paletteAction.run()}>
+        <button type="button" role="menuitem" onClick={() => void paletteAction.run()}>
           Improve prompt
         </button>
       ) : null}
-      <ComposerAssistPopover optimizer={optimizer} shortcut="Ctrl+Shift+U" />
+      <ComposerAssistPopover optimizer={optimizer} shortcut="Ctrl+Shift+U" rewrite={rewrite} />
       <ComposerPromptEditor
         editorRef={editorRef}
         value={prompt}
@@ -127,15 +135,90 @@ function Harness({
         }}
         onPaste={() => {}}
       />
-      <button onClick={() => void optimizer.trigger()}>Improve</button>
+      <button type="button" onClick={() => void optimizer.trigger()}>
+        Improve
+      </button>
+      {onSend ? <button type="submit">Send</button> : null}
       <pre data-draft>{prompt}</pre>
       <ComposerPromptOptimizeStatus optimizer={optimizer} />
       <ComposerBanner.Dock>
         <ComposerPromptOptimizeTab optimizer={optimizer} />
       </ComposerBanner.Dock>
-    </div>
+    </form>
   );
 }
+
+it("closes writing tools on a draft editor click without submitting the form", async () => {
+  fake.run.mockReset();
+  const send = vi.fn();
+  const onSubmit = vi.fn((prompt: string) => send(prompt));
+  const container = document.createElement("div");
+  // Leave room above the trigger, as in the composer, so the popup does not cover the editor.
+  container.style.cssText = "width: 736px; padding-top: 360px";
+  await using screen = await render(
+    <Harness
+      options={{ threadId: null, driver: "codex" }}
+      onSend={onSubmit}
+      rewrite={{ checked: false, disabledReason: null, onCheckedChange: vi.fn() }}
+    />,
+    { container },
+  );
+  using listeners = new DisposableStack();
+  const events: {
+    type: string;
+    target: string | null;
+    submitter: string | null;
+    key: string | null;
+    trusted: boolean;
+  }[] = [];
+  const describeTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return null;
+    if (target.closest('[role="textbox"]')) return "textbox";
+    const button = target.closest("button");
+    return (
+      button?.getAttribute("aria-label") ?? button?.textContent ?? target.tagName.toLowerCase()
+    );
+  };
+  const record = (event: Event) => {
+    events.push({
+      type: event.type,
+      target: describeTarget(event.target),
+      submitter: event instanceof SubmitEvent ? describeTarget(event.submitter) : null,
+      key: event instanceof KeyboardEvent ? event.key : null,
+      trusted: event.isTrusted,
+    });
+  };
+  for (const type of ["pointerdown", "pointerup", "click", "keydown", "submit"]) {
+    document.addEventListener(type, record, true);
+    listeners.defer(() => document.removeEventListener(type, record, true));
+  }
+  const editor = screen.getByRole("textbox");
+  const draft = editor.element().textContent;
+  expect(draft).toContain("fix the bug");
+  const trigger = screen.getByRole("button", { name: /^Writing tools/ });
+  await trigger.click();
+  await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect.element(page.getByRole("switch")).toBeEnabled();
+  await editor.click();
+  await expect.element(trigger).toHaveAttribute("aria-expanded", "false");
+  expect(editor.element().textContent).toBe(draft);
+  expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+  expect(onSubmit).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+  expect(fake.run).not.toHaveBeenCalled();
+  expect(events.filter((event) => event.type === "keydown" || event.type === "submit")).toEqual([]);
+  expect(events.filter((event) => event.target === "textbox").map((event) => event.type)).toEqual([
+    "pointerdown",
+    "pointerup",
+    "click",
+  ]);
+  await screen.getByRole("button", { name: "Send", exact: true }).click();
+  expect(onSubmit).toHaveBeenCalledExactlyOnceWith("  fix the bug  ");
+  expect(send).toHaveBeenCalledExactlyOnceWith("  fix the bug  ");
+  expect(events.filter((event) => event.type === "submit")).toEqual([
+    { type: "submit", target: "form", submitter: "Send", key: null, trusted: true },
+  ]);
+});
 
 it.each(["preparing", "queued", "starting"] as const)(
   "disables optimization for a remote %s run without a local send",
