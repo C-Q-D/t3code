@@ -3039,6 +3039,7 @@ export default function ChatView(props: ChatViewProps) {
     setThreadError,
   });
   const onImplementPlanInNewThread = useImplementPlanInNewThread({
+    composerDraftTarget,
     environmentId,
     routeThreadKey,
     activeThread,

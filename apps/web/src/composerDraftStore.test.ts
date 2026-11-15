@@ -220,6 +220,32 @@ function draftByKey(key: string) {
 }
 
 describe("per-send reply rewrite selection", () => {
+  it.each([false, true])(
+    "clears a promoted draft receipt without clearing a newer choice: %s",
+    (chooseAgain) => {
+      resetComposerDraftStore();
+      const draft = DraftId.make("rewrite-promoted");
+      const target = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rewrite-promoted-thread"));
+      const store = useComposerDraftStore.getState();
+      store.setProjectDraftThreadId(
+        scopeProjectRef(TEST_ENVIRONMENT_ID, ProjectId.make("rewrite-project")),
+        draft,
+        { threadId: target.threadId },
+      );
+      store.setReplyRewrite(draft, false, TEST_ENVIRONMENT_ID);
+      const selection =
+        store.getComposerDraft(draft)?.replyRewriteSelections?.[TEST_ENVIRONMENT_ID];
+      store.markDraftThreadPromoting(draft, target);
+      store.finalizePromotedDraftThread(draft);
+      expect(store.getPromotedDraftRedirect(draft)).toEqual(target);
+      if (chooseAgain) store.setReplyRewrite(target, true);
+      store.completeReplyRewriteSend(draft, selection);
+      expect(
+        store.getComposerDraft(target)?.replyRewriteSelections?.[TEST_ENVIRONMENT_ID]?.enabled,
+      ).toBe(chooseAgain ? true : undefined);
+    },
+  );
+
   it("keeps separate choices when an unsent draft changes environment", () => {
     resetComposerDraftStore();
     const draft = DraftId.make("rewrite-routing");

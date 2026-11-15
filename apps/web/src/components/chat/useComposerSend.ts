@@ -56,7 +56,6 @@ import {
 import {
   type ComposerSubmissionIntent,
   collapseExpandedComposerCursor,
-  parseSideChatCommand,
   parseStandaloneComposerSlashCommand,
 } from "../../composer-logic";
 import { resolvePlanFollowUpSubmission } from "../../proposedPlan";
@@ -489,18 +488,23 @@ export function useComposerSend(input: ComposerSendInput) {
     const replyRewriteSelection = useComposerDraftStore
       .getState()
       .getComposerDraft(composerDraftTarget)?.replyRewriteSelections?.[environmentId];
-    const selectedReplyRewrite =
-      sendCtx?.selectedProvider === "codex" &&
-      (replyRewriteSelection?.enabled ?? replyRewriteDefault);
+    const replyRewriteState = composerReplyRewriteState({
+      provider: sendCtx?.selectedProvider ?? "",
+      defaultEnabled: replyRewriteDefault,
+      selection: replyRewriteSelection,
+      running: phase === "running",
+      dispatchMode,
+      activeRun: input.activeReplyRewriteRun,
+      prompt: sendCtx && !directAnnotation && !queuedRunEdit.isEditing ? promptAtSend : "",
+      sideChatAvailable: onSideChat !== undefined && sideChatDisabledReason === null,
+    });
+    const replyRewrite = replyRewriteState.replyRewrite;
     const completeReplyRewriteSend = () =>
       useComposerDraftStore
         .getState()
         .completeReplyRewriteSend(composerDraftTarget, replyRewriteSelection);
     // `/side` beats an open question and a plan follow-up, which would send the text to main.
-    const sideChatCommand =
-      sendCtx && !directAnnotation && !queuedRunEdit.isEditing
-        ? parseSideChatCommand(promptAtSend)
-        : null;
+    const sideChatCommand = replyRewriteState.sideChat;
     const answeringQuestion =
       Boolean(activePendingProgress) && sendCtx?.answeringPendingUserInput !== false;
     // Where side chats are unavailable, `/side` text can still be a literal answer.
@@ -532,7 +536,7 @@ export function useComposerSend(input: ComposerSendInput) {
         );
         return;
       }
-      const started = await onSideChat(sideChatCommand.prompt, selectedReplyRewrite);
+      const started = await onSideChat(sideChatCommand.prompt, replyRewrite);
       if (started) completeReplyRewriteSend();
       // Clear only what was sent; the user may have edited the draft or left meanwhile.
       if (
@@ -604,14 +608,6 @@ export function useComposerSend(input: ComposerSendInput) {
       interactionMode: sendInteractionMode,
       interactionModeEnabled: sendInteractionModeEnabled,
     } = sendCtx;
-    const replyRewrite = composerReplyRewriteState({
-      provider: ctxSelectedProvider,
-      defaultEnabled: replyRewriteDefault,
-      selection: replyRewriteSelection,
-      running: phase === "running",
-      dispatchMode,
-      activeRun: input.activeReplyRewriteRun,
-    }).replyRewrite;
     const { images: composerImages, previewAnnotations: composerPreviewAnnotations } =
       mergeDirectPreviewAnnotation({
         images: sendContextImages,

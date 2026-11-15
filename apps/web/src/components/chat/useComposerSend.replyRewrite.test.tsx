@@ -5,6 +5,9 @@ import { expect, it, vi } from "vite-plus/test";
 import { DEFAULT_UNIFIED_SETTINGS, EnvironmentId, ThreadId, RunId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { AsyncResult } from "effect/reactivity";
+import { ComposerAssistTools } from "./ComposerAssistTools";
+import { t } from "~/i18n";
+import { resolveComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
 import type { ComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { submitComposerDraft } from "./composerSubmission";
@@ -39,6 +42,10 @@ async function setup(
     provider?: string;
     resume?: boolean;
     side?: boolean;
+    tools?: boolean;
+    legacy?: boolean;
+    editingQueue?: boolean;
+    followUp?: "steer" | "queue";
   } = {},
 ) {
   vi.mocked(readEnvironmentScope).mockReturnValue(true);
@@ -85,7 +92,7 @@ async function setup(
     },
   };
   let pending: Promise<void> | undefined;
-  function Harness() {
+  function Harness({ autoValue, promptValue }: { autoValue: boolean; promptValue: string }) {
     const sendInput = {
       environmentId,
       routeThreadKey: routeKey,
@@ -110,7 +117,7 @@ async function setup(
       phase: options.running ? "running" : "idle",
       runtimeMode: "full-access",
       sendEnvMode: "local",
-      activeReplyRewriteRun: { replyRewrite: options.saved ?? false },
+      activeReplyRewriteRun: options.legacy ? {} : { replyRewrite: options.saved ?? false },
       startFromOrigin: false,
       localCheckoutBranchMismatch: null,
       logicalProjectEnvironments: [],
@@ -173,43 +180,117 @@ async function setup(
       hasHeldQueuedRuns: false,
       scrollToEnd: noop,
     });
-    const submit = () =>
+    const submit = (event: { ctrlKey: boolean; metaKey: boolean }) =>
       submitComposerDraft({
         event: undefined,
         prompt: promptRef.current,
         submissionTarget: "provider-turn",
         onSend: () => {
-          pending = options.resume ? onResume() : onSend(undefined, options.mode ?? "auto");
+          pending = options.resume
+            ? onResume()
+            : onSend(
+                undefined,
+                options.mode ??
+                  (options.tools
+                    ? resolveComposerDispatchMode({
+                        running: options.running ?? false,
+                        alternateModifier: event.ctrlKey || event.metaKey,
+                        activeTurnDefault: options.followUp ?? "steer",
+                      })
+                    : "auto"),
+              );
         },
       });
     return (
-      <button
-        onClick={submit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") submit();
-        }}
-      >
-        Send
-      </button>
+      <>
+        {options.tools ? (
+          <ComposerAssistTools
+            environmentId={environmentId}
+            target={target}
+            provider={options.provider ?? "codex"}
+            defaultEnabled={autoValue}
+            running={options.running ?? false}
+            followUpBehavior={options.followUp ?? "steer"}
+            canSteer={true}
+            editingQueue={options.editingQueue ?? false}
+            unavailable={false}
+            prompt={promptValue}
+            sideChatAvailable={options.side ?? false}
+            activeRun={options.legacy ? {} : { replyRewrite: options.saved ?? false }}
+            optimizer={{
+              visible: false,
+              disabledReason: null,
+              inFlight: false,
+              cacheMaybeExpired: false,
+              trigger: async () => {},
+              undo: () => {},
+              label: "",
+              done: false,
+              availability: {
+                getSnapshot: () => false,
+                subscribe: () => () => {},
+                update: () => {},
+              },
+            }}
+          />
+        ) : null}
+        <button
+          data-test-send
+          onClick={submit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") submit(event);
+          }}
+        >
+          Send
+        </button>
+      </>
     );
   }
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
-  await act(async () => root.render(<Harness />));
-  const press = (kind: "button" | "keyboard") => {
-    const button = host.querySelector("button")!;
-    if (kind === "button") button.click();
-    else button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await act(async () => root.render(<Harness autoValue={auto} promptValue={promptRef.current} />));
+  const press = (
+    kind: "button" | "keyboard",
+    modifiers: { ctrlKey?: boolean; metaKey?: boolean } = {},
+  ) => {
+    const button = host.querySelector<HTMLButtonElement>("[data-test-send]")!;
+    if (kind === "button")
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, ...modifiers }));
+    else
+      button.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, ...modifiers }),
+      );
     return pending;
   };
   return {
     target,
     press,
     promptRef,
+    openTools: async () => {
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('[data-slot="popover-trigger"]')!.click(),
+      );
+    },
+    trigger: () => host.querySelector<HTMLButtonElement>('[data-slot="popover-trigger"]')!,
+    toggle: () => document.querySelector<HTMLElement>('[role="switch"]')!,
+    key: async (type: "keydown" | "keyup", key: string) => {
+      await act(async () => window.dispatchEvent(new KeyboardEvent(type, { key })));
+    },
+    blur: async () => {
+      await act(async () => window.dispatchEvent(new Event("blur")));
+    },
+    setPrompt: async (value: string) => {
+      promptRef.current = value;
+      await act(async () =>
+        root.render(<Harness autoValue={auto} promptValue={promptRef.current} />),
+      );
+    },
     setDefault: async (value: boolean) => {
       auto = value;
-      await act(async () => root.render(<Harness />));
+      await act(async () =>
+        root.render(<Harness autoValue={auto} promptValue={promptRef.current} />),
+      );
     },
     [Symbol.asyncDispose]: async () => {
       await act(async () => root.unmount());
@@ -350,4 +431,115 @@ it.each([
   expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
     { replyRewrite: expected, dispatchMode: mode },
   ]);
+});
+
+it.each(["Control", "Meta"])(
+  "shows and edits the actual alternate queue decision while %s is held, then resets on release and blur",
+  async (key) => {
+    await using h = await setup({ tools: true, running: true, saved: false });
+    await h.setDefault(true);
+    await h.openTools();
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    expect(document.body.textContent).toContain(t.composer.assist.tools.inherited);
+    await h.key("keydown", key);
+    expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+    await act(async () => h.toggle().click());
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    await act(async () => h.toggle().click());
+    expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+    await act(async () => {
+      await h.press("button", key === "Control" ? { ctrlKey: true } : { metaKey: true });
+    });
+    expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
+      { replyRewrite: true, dispatchMode: "queue" },
+    ]);
+    await h.openTools();
+    await h.key("keyup", key);
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    await h.key("keydown", key);
+    expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+    await h.blur();
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+    await act(async () => h.toggle().click());
+    expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+  },
+);
+
+it("switches from the default queue choice to inherited steering while the alternate key is held", async () => {
+  await using h = await setup({ tools: true, running: true, saved: false, followUp: "queue" });
+  await h.setDefault(true);
+  await h.openTools();
+  expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+  await h.key("keydown", "Meta");
+  expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+  await act(async () => {
+    await h.press("keyboard", { metaKey: true });
+  });
+  expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
+    { replyRewrite: false, dispatchMode: "steer" },
+  ]);
+  await h.key("keyup", "Meta");
+  expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+});
+
+it("shows a side-chat new run's independent choice during an active reply and sends the edited choice", async () => {
+  await using h = await setup({
+    tools: true,
+    running: true,
+    saved: false,
+    side: true,
+    mode: "steer",
+  });
+  await h.setDefault(true);
+  await h.setPrompt("/side Explain this");
+  await h.openTools();
+  expect(h.toggle().getAttribute("aria-checked")).toBe("true");
+  await act(async () => h.toggle().click());
+  expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+  await act(async () => {
+    await h.press("button");
+  });
+  expect(fake.side.mock.calls).toEqual([["Explain this", false]]);
+});
+
+it.each([false, true])(
+  "announces an unknown legacy run without calling it off, including queue editing: %s",
+  async (editingQueue) => {
+    await using h = await setup({ tools: true, running: true, legacy: true, editingQueue });
+    expect(h.trigger().getAttribute("aria-label")).toContain(t.composer.assist.tools.unknownRun);
+    expect(h.trigger().getAttribute("aria-label")).not.toContain(
+      t.composer.assist.tools.rewriteOff,
+    );
+    await h.openTools();
+    expect(h.toggle().getAttribute("aria-checked")).toBe("mixed");
+    expect(h.toggle().hasAttribute("data-disabled")).toBe(true);
+    expect(document.body.textContent).toContain(t.composer.assist.tools.unknownRun);
+    if (editingQueue)
+      expect(document.body.textContent).toContain(t.composer.assist.tools.editingQueue);
+    await act(async () => h.toggle().click());
+    expect(
+      useComposerDraftStore.getState().getComposerDraft(h.target)?.replyRewriteSelections,
+    ).toBeUndefined();
+  },
+);
+
+it("announces a non-Codex provider as unavailable instead of an unknown legacy setting", async () => {
+  await using h = await setup({
+    tools: true,
+    running: true,
+    legacy: true,
+    provider: "claudeAgent",
+  });
+  expect(h.trigger().getAttribute("aria-label")).toContain(t.composer.assist.tools.codexOnly);
+  expect(h.trigger().getAttribute("aria-label")).not.toContain(t.composer.assist.tools.unknownRun);
+  expect(h.trigger().getAttribute("aria-label")).not.toContain(t.composer.assist.tools.rewriteOff);
+  await h.openTools();
+  expect(h.toggle().getAttribute("aria-checked")).toBe("false");
+  expect(h.toggle().hasAttribute("data-disabled")).toBe(true);
+  expect(document.body.textContent).toContain(t.composer.assist.tools.codexOnly);
+  expect(document.body.textContent).not.toContain(t.composer.assist.tools.unknownRun);
+  await act(async () => h.toggle().click());
+  expect(
+    useComposerDraftStore.getState().getComposerDraft(h.target)?.replyRewriteSelections,
+  ).toBeUndefined();
 });

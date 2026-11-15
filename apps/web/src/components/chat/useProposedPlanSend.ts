@@ -6,6 +6,7 @@ import {
   type ModelSelection,
   type ProviderInteractionMode,
   type RuntimeMode,
+  type UnifiedSettings,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
@@ -23,7 +24,8 @@ import { truncate } from "@t3tools/shared/String";
 import { useNavigate } from "@tanstack/react-router";
 import type { Dispatch, SetStateAction } from "react";
 import { newMessageId, newThreadId } from "~/lib/utils";
-import { useComposerDraftStore } from "../../composerDraftStore";
+import { useComposerDraftStore, type ComposerThreadTarget } from "../../composerDraftStore";
+import { useEnvironmentSettings } from "../../hooks/useSettings";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import type { buildMessageContext } from "../../lib/composerContextRecords";
 import {
@@ -46,6 +48,7 @@ import type { useLocalDispatchState } from "./useLocalDispatchState";
 import type { useTimelineFollow } from "./useTimelineFollow";
 
 type LocalDispatchState = ReturnType<typeof useLocalDispatchState>;
+const selectReplyRewriteAuto = (settings: UnifiedSettings) => settings.replyRewrite.auto;
 
 interface PlanSendBase {
   readonly environmentId: EnvironmentId;
@@ -239,6 +242,7 @@ export function usePlanFollowUpSend(input: PlanFollowUpSendInput) {
 }
 
 interface ImplementPlanInNewThreadInput extends PlanSendBase {
+  readonly composerDraftTarget: ComposerThreadTarget;
   readonly activeProject: EnvironmentProject | null;
   readonly activeEnvironmentUnavailable: boolean;
   readonly defaultRuntimeMode: RuntimeMode;
@@ -263,6 +267,7 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
     activeProject,
     activeEnvironmentUnavailable,
     defaultRuntimeMode,
+    composerDraftTarget,
   } = input;
   const navigate = useNavigate();
   const createThread = useOrchestrationCommand(threadEnvironment.create, { reportFailure: false });
@@ -271,6 +276,7 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
     reportFailure: false,
   });
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
+  const replyRewriteDefault = useEnvironmentSettings(environmentId, selectReplyRewriteAuto);
 
   return async () => {
     if (
@@ -290,6 +296,11 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
     if (!sendCtx?.providerAvailable || !sendCtx.interactionModeEnabled) {
       return;
     }
+
+    const selection = useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)
+      ?.replyRewriteSelections?.[environmentId];
+    const replyRewrite =
+      sendCtx.selectedProvider === "codex" && (selection?.enabled ?? replyRewriteDefault);
 
     const createdAt = new Date().toISOString();
     const nextThreadId = newThreadId();
@@ -329,6 +340,7 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
         environmentId,
         input: {
           threadId: nextThreadId,
+          replyRewrite,
           message: {
             messageId: newMessageId(),
             role: "user",
@@ -369,6 +381,9 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
       failure = navigateResult._tag === "Failure" ? navigateResult : null;
     }
 
+    if (failure === null) {
+      useComposerDraftStore.getState().completeReplyRewriteSend(composerDraftTarget, selection);
+    }
     if (failure !== null) {
       const cleanupResult = await deleteThread({
         environmentId,

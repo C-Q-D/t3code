@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 /** Renders composition using isolated controls while preserving local layout and physical feedback. */
 import { Link2Icon } from "lucide-react";
 import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
-import { ComposerAssistPopover } from "./ComposerAssistPopover";
-import { composerReplyRewriteState } from "./composerSend.logic";
+import { ComposerAssistTools } from "./ComposerAssistTools";
 import {
   ComposerPromptOptimizeTab,
   ComposerPromptOptimizeStatus,
@@ -3221,33 +3220,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
   });
   const optimizePromptStable = useStableCallback(promptOptimizer.trigger);
-  const replyRewriteState = composerReplyRewriteState({
-    provider: selectedProvider,
-    defaultEnabled: settings.replyRewrite.auto,
-    selection: composerDraft.replyRewriteSelections?.[environmentId],
-    running: phase === "running" || isEditingQueuedMessage,
-    dispatchMode: isEditingQueuedMessage
-      ? "steer"
-      : resolveComposerDispatchMode({
-          running: phase === "running",
-          alternateModifier: false,
-          activeTurnDefault: followUpBehavior,
-          canSteer: !isCompacting,
-        }),
-    activeRun: props.replyRewriteRun,
-  });
-  const rewriteCopy = t.composer.assist.tools;
-  const rewriteDisabledReason = isEditingQueuedMessage
-    ? rewriteCopy.editingQueue
-    : replyRewriteState.inherited
-      ? replyRewriteState.known
-        ? rewriteCopy.inherited
-        : `${rewriteCopy.inherited} · ${rewriteCopy.unknownRun}`
-      : !replyRewriteState.supported
-        ? rewriteCopy.codexOnly
-        : !canOperateThread || noProviderAvailable || pendingUserInputs.length > 0
-          ? rewriteCopy.unavailable
-          : null;
 
   useImperativeHandle(
     composerRef,
@@ -4174,19 +4146,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   }
                   className="flex shrink-0 flex-nowrap items-center justify-end gap-2"
                 >
-                  <ComposerAssistPopover
+                  <ComposerAssistTools
                     key={`${environmentId}:${composerDraftTargetKey}`}
+                    environmentId={environmentId}
+                    target={composerDraftTarget}
+                    provider={selectedProvider}
+                    defaultEnabled={settings.replyRewrite.auto}
+                    running={phase === "running"}
+                    followUpBehavior={followUpBehavior}
+                    canSteer={!isCompacting}
+                    editingQueue={isEditingQueuedMessage}
+                    unavailable={
+                      !canOperateThread || noProviderAvailable || pendingUserInputs.length > 0
+                    }
+                    activeRun={props.replyRewriteRun}
+                    prompt={prompt}
+                    sideChatAvailable={
+                      props.sideChatAvailable === true && !props.sideChatDisabledReason
+                    }
                     optimizer={promptOptimizer}
-                    rewrite={{
-                      checked: replyRewriteState.checked,
-                      disabledReason: rewriteDisabledReason,
-                      onCheckedChange: (checked) => {
-                        if (rewriteDisabledReason !== null) return;
-                        useComposerDraftStore
-                          .getState()
-                          .setReplyRewrite(composerDraftTarget, checked, environmentId);
-                      },
-                    }}
                     shortcut={shortcutLabelForCommand(keybindings, "composer.optimizePrompt", {
                       context: { composerFocus: true },
                     })}

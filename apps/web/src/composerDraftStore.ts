@@ -2960,7 +2960,12 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
           }));
         },
         completeReplyRewriteSend: (threadRef, selection) => {
-          const threadKey = resolveComposerDraftKey(get(), threadRef);
+          const state = get();
+          const target =
+            typeof threadRef === "string"
+              ? (state.promotedDraftRedirects[threadRef] ?? threadRef)
+              : threadRef;
+          const threadKey = resolveComposerDraftKey(state, target);
           if (!threadKey || selection === undefined) return;
           set((state) => {
             const current = state.draftsByThreadKey[threadKey];

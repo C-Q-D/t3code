@@ -3,6 +3,7 @@ import { t } from "~/i18n";
 import type { EnvironmentId, ThreadContextRecord } from "@t3tools/contracts";
 import { collectInlineContextIds } from "../../lib/composerContextReferences";
 import type { ComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
+import { parseSideChatCommand } from "../../composer-logic";
 
 /** Resolves the visible run decision and freezes the wire value before asynchronous send work. */
 export function composerReplyRewriteState(input: {
@@ -12,13 +13,19 @@ export function composerReplyRewriteState(input: {
   readonly running: boolean;
   readonly dispatchMode: ComposerDispatchMode;
   readonly activeRun?: { readonly replyRewrite?: boolean | undefined } | null | undefined;
+  readonly prompt?: string;
+  readonly sideChatAvailable?: boolean;
 }) {
+  const sideChat = parseSideChatCommand(input.prompt ?? "");
   const inherited =
-    input.running && (input.dispatchMode === "steer" || input.dispatchMode === "restart");
+    input.running &&
+    (input.dispatchMode === "steer" || input.dispatchMode === "restart") &&
+    !(sideChat && input.sideChatAvailable);
   const supported = input.provider === "codex";
   const selected = supported && (input.selection?.enabled ?? input.defaultEnabled);
   const saved = inherited ? input.activeRun?.replyRewrite : undefined;
   return {
+    sideChat,
     inherited,
     supported,
     known: !inherited || saved !== undefined,

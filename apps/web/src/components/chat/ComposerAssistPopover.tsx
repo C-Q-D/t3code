@@ -19,6 +19,8 @@ export function ComposerAssistPopover({
   shortcut?: string | null;
   rewrite?: {
     checked: boolean;
+    known?: boolean;
+    supported?: boolean;
     disabledReason: string | null;
     onCheckedChange: (checked: boolean) => void;
   };
@@ -27,10 +29,23 @@ export function ComposerAssistPopover({
   const id = useId();
   const copy = t.composer.assist.tools;
   const optimize = t.composer.assist.optimize;
-  const checked = rewrite?.checked ?? false;
+  const supported = rewrite?.supported ?? Boolean(rewrite);
+  const known = rewrite?.known ?? true;
+  const checked = supported && known && (rewrite?.checked ?? false);
   const warning = optimizer.visible && !optimizer.disabledReason && optimizer.cacheMaybeExpired;
   const optimizeReason = optimizer.visible ? optimizer.disabledReason : copy.optimizeUnavailable;
-  const rewriteReason = rewrite?.disabledReason ?? (rewrite ? null : copy.codexOnly);
+  const rewriteReason = !supported
+    ? copy.codexOnly
+    : !known
+      ? [rewrite?.disabledReason, copy.unknownRun].filter(Boolean).join(" · ")
+      : (rewrite?.disabledReason ?? null);
+  const rewriteLabel = !supported
+    ? copy.codexOnly
+    : !known
+      ? copy.unknownRun
+      : checked
+        ? copy.rewriteOn
+        : copy.rewriteOff;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -41,7 +56,7 @@ export function ComposerAssistPopover({
             className="composer-assist-trigger w-8.5 p-0"
           />
         }
-        aria-label={`${copy.title} · ${checked ? copy.rewriteOn : copy.rewriteOff}`}
+        aria-label={`${copy.title} · ${rewriteLabel}`}
         data-rewrite-enabled={checked ? "true" : "false"}
         data-panel-open={open ? "true" : "false"}
       >
@@ -117,6 +132,7 @@ export function ComposerAssistPopover({
               id={`${id}-rewrite`}
               variant="accent"
               checked={checked}
+              mixed={supported && !known}
               disabled={rewriteReason !== null}
               aria-describedby={rewriteReason ? `${id}-rewrite-help` : undefined}
               onCheckedChange={(value) => rewrite?.onCheckedChange(value)}
