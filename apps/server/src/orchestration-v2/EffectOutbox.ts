@@ -31,6 +31,14 @@ import { forkParked } from "../serverActivation.ts";
 
 export const OrchestrationEffectRequestV2 = Schema.Union([
   Schema.Struct({
+    type: Schema.Literal("reply-rewrite.run"),
+    requestId: Schema.String,
+    messageId: MessageId,
+    runId: RunId,
+    generation: Schema.Number,
+    sourceHash: Schema.String,
+  }),
+  Schema.Struct({
     type: Schema.Literal("provider-runtime.continue"),
     sourceRunId: RunId,
   }),
@@ -196,6 +204,7 @@ const isEffectOutboxError = Schema.is(EffectOutboxError);
 
 export interface EffectOutboxV2Shape {
   readonly awaitAvailable: Effect.Effect<void>;
+  readonly awaitRewriteAvailable: Effect.Effect<void>;
   readonly notifyAvailable: (count?: number) => Effect.Effect<void>;
   /** Persist rows only. Notify workers after the surrounding transaction commits. */
   readonly enqueue: (
@@ -224,6 +233,7 @@ export interface EffectOutboxV2Shape {
   readonly claimNext: (input: {
     readonly workerId: string;
     readonly excludeRestartContinuations?: boolean;
+    readonly workerGroup?: "main" | "reply-rewrite";
   }) => Effect.Effect<Option.Option<OrchestrationEffectV2>, EffectOutboxError>;
   readonly nextClaimableAt: Effect.Effect<Option.Option<DateTime.Utc>, EffectOutboxError>;
   readonly succeed: (input: {
@@ -292,6 +302,7 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const available = yield* Queue.dropping<void>(64);
+    const rewriteAvailable = yield* Queue.dropping<void>(1);
     const cancellationSignals = new Map<string, Deferred.Deferred<void>>();
     const settledSignals = new Map<string, Deferred.Deferred<void>>();
     const signalSettled = (effectIds: ReadonlyArray<string>) =>
@@ -309,11 +320,12 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
       Queue.offerAll(
         available,
         Array.from({ length: Math.min(64, Math.max(0, Math.floor(count))) }, () => undefined),
-      ).pipe(Effect.asVoid);
+      ).pipe(Effect.andThen(Queue.offer(rewriteAvailable, undefined)), Effect.asVoid);
     // Retry backoff must block later effects so turns cannot race a pending rollback.
     const claimableCandidatePredicate = (
       availableBefore?: string,
       excludeRestartContinuations = false,
+      workerGroup: "main" | "reply-rewrite" = "main",
     ) =>
       sql`
         ${
@@ -322,10 +334,12 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
             : sql`candidate.available_at <= ${availableBefore}`
         }
         AND candidate.status = 'pending'
+        AND ${workerGroup === "reply-rewrite" ? sql`candidate.effect_type = 'reply-rewrite.run'` : sql`candidate.effect_type != 'reply-rewrite.run'`}
         AND NOT EXISTS (
           SELECT 1
           FROM orchestration_v2_effect_outbox AS active
           WHERE active.thread_id = candidate.thread_id
+            AND ${workerGroup === "reply-rewrite" ? sql`active.effect_type = 'reply-rewrite.run'` : sql`active.effect_type != 'reply-rewrite.run'`}
             AND (
               active.status = 'running'
               OR (
@@ -420,6 +434,7 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
           Effect.mapError((cause) => new EffectOutboxError({ operation: "get", effectId, cause })),
         ),
       awaitAvailable: Queue.take(available),
+      awaitRewriteAvailable: Queue.take(rewriteAvailable),
       notifyAvailable,
       listByCommandId: (commandId) =>
         sql<EffectRow>`
@@ -519,7 +534,7 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
       ),
       // The worker polls for the next effect even when there is no work to claim.
       claimNext: Effect.fnUntraced(
-        function* ({ workerId, excludeRestartContinuations = false }) {
+        function* ({ workerId, excludeRestartContinuations = false, workerGroup = "main" }) {
           const now = yield* DateTime.now;
           const nowIso = DateTime.formatIso(now);
           // Idle claims return empty; tracing their full SQL on every poll overwhelms useful traces.
@@ -534,7 +549,7 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
             WHERE effect_id = (
               SELECT candidate.effect_id
               FROM orchestration_v2_effect_outbox AS candidate
-              WHERE ${claimableCandidatePredicate(nowIso, excludeRestartContinuations)}
+              WHERE ${claimableCandidatePredicate(nowIso, excludeRestartContinuations, workerGroup)}
                 AND ${excludeRestartContinuations ? sql`candidate.effect_type != 'provider-runtime.continue'` : sql`1 = 1`}
               ORDER BY candidate.available_at ASC, candidate.created_at ASC, candidate.effect_id ASC
               LIMIT 1

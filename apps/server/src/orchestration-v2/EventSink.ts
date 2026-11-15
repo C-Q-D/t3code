@@ -30,6 +30,7 @@ import { makeRunOutcomeRecorder, type RunOutcome } from "./RunMetrics.ts";
 
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
+import * as ReplyRewriteService from "../replyRewrite/ReplyRewriteService.ts";
 import * as EventStore from "./EventStore.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProjectStore from "./ProjectStore.ts";
@@ -252,6 +253,15 @@ const layerBase: Layer.Layer<
         .pipe(
           Effect.andThen(eventStore.publishCommitted(events)),
           Effect.andThen(publishLiveEvents(events)),
+          Effect.andThen(
+            Effect.serviceOption(ReplyRewriteService.ReplyRewriteService).pipe(
+              Effect.flatMap((replyRewrites) =>
+                Option.isSome(replyRewrites)
+                  ? replyRewrites.value.onCommitted(events)
+                  : Effect.void,
+              ),
+            ),
+          ),
         );
 
     // Serialize commit and publish; reordered publication makes clients drop earlier sequences.
@@ -358,6 +368,9 @@ const layerBase: Layer.Layer<
         yield* Effect.forEach(storedEvents, (stored) => projectionStore.apply(stored.event), {
           concurrency: 1,
         });
+        // Observers and the CLI can construct this shared sink before rewrite services exist.
+        const replyRewrites = yield* Effect.serviceOption(ReplyRewriteService.ReplyRewriteService);
+        if (Option.isSome(replyRewrites)) yield* replyRewrites.value.onEvents(storedEvents);
         const sequence = storedEvents.at(-1)?.sequence;
         if (sequence !== undefined) {
           const now = DateTime.formatIso(yield* DateTime.now);

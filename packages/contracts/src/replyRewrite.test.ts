@@ -86,6 +86,8 @@ describe("reply rewrite boundaries", () => {
     [REPLY_REWRITE_WS_METHODS.getDetail, "orchestration:read"],
     [REPLY_REWRITE_WS_METHODS.request, "orchestration:operate"],
     [REPLY_REWRITE_WS_METHODS.cancel, "orchestration:operate"],
+    [REPLY_REWRITE_WS_METHODS.list, "orchestration:read"],
+    [REPLY_REWRITE_WS_METHODS.subscribe, "orchestration:read"],
   ])("requires destination authority for %s", (method, scope) => {
     expect(clientRpcRequiredScopes(method, targetInput)).toEqual([scope]);
   });

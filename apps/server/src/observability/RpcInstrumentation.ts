@@ -1,5 +1,10 @@
 /** Classifies and instruments server RPC requests; does not implement or authorize operations. */
-import { ORCHESTRATION_V2_WS_METHODS, WS_METHODS, type WsRpcGroup } from "@t3tools/contracts";
+import {
+  ORCHESTRATION_V2_WS_METHODS,
+  REPLY_REWRITE_WS_METHODS,
+  WS_METHODS,
+  type WsRpcGroup,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as References from "effect/References";
@@ -12,6 +17,11 @@ type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
 
 // Trace queries and dashboards depend on these labels, including deviations from method prefixes.
 const RPC_AGGREGATES = {
+  [REPLY_REWRITE_WS_METHODS.getDetail]: "replyRewrite",
+  [REPLY_REWRITE_WS_METHODS.request]: "replyRewrite",
+  [REPLY_REWRITE_WS_METHODS.cancel]: "replyRewrite",
+  [REPLY_REWRITE_WS_METHODS.list]: "replyRewrite",
+  [REPLY_REWRITE_WS_METHODS.subscribe]: "replyRewrite",
   [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: "orchestrationV2",
   [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.stopWorkflow]: "orchestration",

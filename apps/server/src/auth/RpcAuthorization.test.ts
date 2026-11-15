@@ -19,6 +19,10 @@ import {
   WS_METHODS,
   WsRpcGroup,
   DiscussionPromptId,
+  REPLY_REWRITE_WS_METHODS,
+  ReplyRewriteError,
+  MessageId,
+  RunId,
   type AuthEnvironmentScope,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
@@ -38,6 +42,7 @@ import {
   requiredScopeForDeviceList,
 } from "./RpcAuthorization.ts";
 import * as RpcAuthorization from "./RpcAuthorization.ts";
+import { OperationScopes } from "./OperationScopes.ts";
 
 const discussionMethods = [
   WS_METHODS.discussionPromptsList,
@@ -793,5 +798,79 @@ it.effect("denies manual cleanup before the handler without settings permission"
       requiredPermission: AuthSettingsWriteScope,
     });
     expect(handled).toBe(false);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("separates rewrite reads from mutations and passes destination scopes to handlers", () =>
+  Effect.gen(function* () {
+    const methods = Object.values(REPLY_REWRITE_WS_METHODS);
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (tag): tag is Exclude<RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"], (typeof methods)[number]> =>
+          !methods.includes(tag as (typeof methods)[number]),
+      ),
+    );
+    const calls: string[] = [];
+    const mutation = (method: string) =>
+      Effect.sync(() => calls.push(method)).pipe(
+        Effect.andThen(
+          Effect.fail(new ReplyRewriteError({ code: "not_found", message: "Reached handler." })),
+        ),
+      );
+    const handlers = Layer.mergeAll(
+      group.toLayerHandler(REPLY_REWRITE_WS_METHODS.getDetail, () =>
+        Effect.gen(function* () {
+          expect(yield* OperationScopes).toEqual([AuthOrchestrationReadScope]);
+          calls.push("detail");
+          return null;
+        }),
+      ),
+      group.toLayerHandler(REPLY_REWRITE_WS_METHODS.list, () =>
+        Effect.succeed({ records: [], nextCursor: null, revision: 0 }),
+      ),
+      group.toLayerHandler(REPLY_REWRITE_WS_METHODS.subscribe, () => Stream.empty),
+      group.toLayerHandler(REPLY_REWRITE_WS_METHODS.request, () => mutation("request")),
+      group.toLayerHandler(REPLY_REWRITE_WS_METHODS.cancel, () => mutation("cancel")),
+    );
+    const target = {
+      threadId: ThreadId.make("thread"),
+      runId: RunId.make("run"),
+      messageId: MessageId.make("message"),
+    };
+    const reader = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(Layer.merge(handlers, RpcAuthorization.layer([AuthOrchestrationReadScope]))),
+    );
+    expect(yield* reader[REPLY_REWRITE_WS_METHODS.getDetail](target)).toBeNull();
+    yield* reader[REPLY_REWRITE_WS_METHODS.list]({ threadId: target.threadId });
+    yield* reader[REPLY_REWRITE_WS_METHODS.subscribe]({
+      threadId: target.threadId,
+      afterRevision: 0,
+    }).pipe(Stream.runDrain);
+    for (const method of [
+      REPLY_REWRITE_WS_METHODS.request,
+      REPLY_REWRITE_WS_METHODS.cancel,
+    ] as const) {
+      expect(
+        yield* reader[method]({ ...target, requestId: "request" }).pipe(Effect.flip),
+      ).toMatchObject({ requiredPermission: AuthOrchestrationOperateScope });
+    }
+    expect(calls).toEqual(["detail"]);
+    const operator = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(
+        Layer.merge(handlers, RpcAuthorization.layer([AuthOrchestrationOperateScope])),
+      ),
+    );
+    for (const method of [
+      REPLY_REWRITE_WS_METHODS.request,
+      REPLY_REWRITE_WS_METHODS.cancel,
+    ] as const) {
+      expect(
+        yield* operator[method]({ ...target, requestId: "request" }).pipe(Effect.flip),
+      ).toMatchObject({ _tag: "ReplyRewriteError", code: "not_found" });
+    }
+    expect(
+      yield* operator[REPLY_REWRITE_WS_METHODS.getDetail](target).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthOrchestrationReadScope });
+    expect(calls).toEqual(["detail", "request", "cancel"]);
   }).pipe(Effect.scoped),
 );

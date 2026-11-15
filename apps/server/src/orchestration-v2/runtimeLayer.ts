@@ -26,6 +26,8 @@ import * as CommandPolicy from "./CommandPolicy.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
+import * as ReplyRewriteService from "../replyRewrite/ReplyRewriteService.ts";
+import * as ReplyRewriteWorker from "../replyRewrite/ReplyRewriteWorker.ts";
 import * as EffectWorker from "./EffectWorker.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
@@ -85,6 +87,10 @@ const layerStores = Layer.mergeAll(
   TurnItemPositionStore.layer,
 );
 
+const layerReplyRewrites = ReplyRewriteService.layer.pipe(Layer.provide(EffectOutbox.layer));
+const layerReplyRewriteWorker = ReplyRewriteWorker.layer.pipe(
+  Layer.provide(Layer.merge(layerReplyRewrites, EffectOutbox.layer)),
+);
 export const layerEventSink = EventSink.layerFromStores.pipe(Layer.provide(layerStores));
 const layerProjectionMaintenanceProvided = ProjectionMaintenance.layer.pipe(
   Layer.provide(layerStores),
@@ -366,6 +372,8 @@ const layerMcpAppRequestsProvided = McpAppRequests.layer.pipe(
 );
 
 export const layer = Layer.mergeAll(
+  layerReplyRewrites,
+  layerReplyRewriteWorker,
   layerCommandOutputHubProvided,
   layerOrchestratorProvided,
   layerMcpAppRequestsProvided,
@@ -402,6 +410,7 @@ export const layerProduction = Layer.mergeAll(
   layerAgentSessionImporterProvided,
   EffectOutbox.layerPruneWorker.pipe(Layer.provide(EffectOutbox.layer)),
 ).pipe(
+  Layer.provideMerge(layerReplyRewrites),
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
   Layer.provide(Scheduler.layer),
   Layer.provideMerge(layerEventInfrastructure),

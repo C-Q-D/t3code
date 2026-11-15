@@ -188,6 +188,8 @@ import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as ServerSettings from "./serverSettings.ts";
+import * as ReplyRewriteService from "./replyRewrite/ReplyRewriteService.ts";
+import { REPLY_REWRITE_WS_METHODS } from "@t3tools/contracts";
 import { invalidateSettingsSecrets } from "./sourceControl/sourceControlHostSecrets.ts";
 import * as DatabaseStorage from "./persistence/DatabaseStorage.ts";
 import * as StorageCleanup from "./storageCleanup.ts";
@@ -1415,6 +1417,7 @@ export const layerWsRpc = (
       const storageCleanup = yield* StorageCleanup.StorageCleanup;
       const databaseStorage = yield* DatabaseStorage.DatabaseStorage;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
+      const replyRewrites = yield* ReplyRewriteService.ReplyRewriteService;
       const secretResolver = yield* SecretResolver.SecretResolver;
       const peerLinks = yield* PeerLinks.PeerLinks;
       const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
@@ -1942,6 +1945,11 @@ export const layerWsRpc = (
       });
 
       const handlers = BaseWsRpcGroup.of({
+        [REPLY_REWRITE_WS_METHODS.getDetail]: (input) => replyRewrites.getDetail(input),
+        [REPLY_REWRITE_WS_METHODS.request]: (input) => replyRewrites.request(input),
+        [REPLY_REWRITE_WS_METHODS.cancel]: (input) => replyRewrites.cancel(input),
+        [REPLY_REWRITE_WS_METHODS.list]: (input) => replyRewrites.list(input),
+        [REPLY_REWRITE_WS_METHODS.subscribe]: (input) => replyRewrites.subscribe(input),
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,

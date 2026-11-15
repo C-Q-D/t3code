@@ -18,6 +18,8 @@ import {
   type ServerSettingsPatch,
   globalIdleCompaction,
   withIdleCompaction,
+  requiredScopesForServerSettingsPatch,
+  AuthProvidersManageScope,
 } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
@@ -43,6 +45,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { resolveSymlinkTarget } from "@t3tools/shared/symlink";
 import * as ServerConfig from "./config.ts";
+import { requireOperationScope } from "./auth/OperationScopes.ts";
 import { type DeepPartial, deepMerge } from "@t3tools/shared/Struct";
 import { fromJsonStringPretty, fromLenientJson } from "@t3tools/shared/schemaJson";
 import {
@@ -71,6 +74,19 @@ const decodeServerSettings = Schema.decodeUnknownEffect(ServerSettings);
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+
+const authorizeSettingsPatch = Effect.fn("serverSettings.authorizePatch")(function* (
+  patch: ServerSettingsPatch,
+  settingsPath: string,
+) {
+  yield* Effect.forEach(requiredScopesForServerSettingsPatch(patch), requireOperationScope, {
+    discard: true,
+  }).pipe(
+    Effect.mapError(
+      (cause) => new ServerSettingsError({ settingsPath, operation: "write-file", cause }),
+    ),
+  );
+});
 
 // Conflicting flags resolve to false to preserve user disables.
 const foldProviderInstanceEnabledFlags = (settings: ServerSettings): ServerSettings => {
@@ -286,11 +302,24 @@ const makeTest = Effect.fn("serverSettings.makeTest")(function* (
     getSettings,
     updateSettings: (patch) =>
       updateTestSettings((currentSettings) =>
-        Effect.succeed(applyServerSettingsPatch(currentSettings, patch)),
+        authorizeSettingsPatch(patch, "test settings").pipe(
+          Effect.as(applyServerSettingsPatch(currentSettings, patch)),
+        ),
       ),
     updateProviderInstance: (mutation, patch = {}) =>
       updateTestSettings((currentSettings) =>
         Effect.gen(function* () {
+          if (Object.keys(patch).length > 0) yield* authorizeSettingsPatch(patch, "test settings");
+          yield* requireOperationScope(AuthProvidersManageScope).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({
+                  settingsPath: "test settings",
+                  operation: "write-file",
+                  cause,
+                }),
+            ),
+          );
           yield* ensureProviderInstanceMutationAllowed(currentSettings, mutation, "test settings");
           const patched = applyServerSettingsPatch(currentSettings, patch);
           return applyProviderInstanceMutation(patched, mutation);
@@ -1219,13 +1248,20 @@ const make = Effect.gen(function* () {
     getSettings: getMaterializedSettings,
     updateSettings: (patch) =>
       updateAndPersistSettings((current) =>
-        ensureSecretProviderWritesAllowed(patch, settingsPath).pipe(
+        authorizeSettingsPatch(patch, settingsPath).pipe(
+          Effect.andThen(ensureSecretProviderWritesAllowed(patch, settingsPath)),
           Effect.as(applyServerSettingsPatch(current, patch)),
         ),
       ),
     updateProviderInstance: (mutation, patch = {}) =>
       updateAndPersistSettings((current) =>
         Effect.gen(function* () {
+          if (Object.keys(patch).length > 0) yield* authorizeSettingsPatch(patch, settingsPath);
+          yield* requireOperationScope(AuthProvidersManageScope).pipe(
+            Effect.mapError(
+              (cause) => new ServerSettingsError({ settingsPath, operation: "write-file", cause }),
+            ),
+          );
           yield* ensureSecretProviderWritesAllowed(patch, settingsPath);
           yield* ensureProviderInstanceMutationAllowed(current, mutation, settingsPath);
           const patched = applyServerSettingsPatch(current, patch);

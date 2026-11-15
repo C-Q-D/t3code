@@ -33,11 +33,30 @@ import * as ServerConfig from "./config.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as ServerSettingsModule from "./serverSettings.ts";
+import { OperationScopes } from "./auth/OperationScopes.ts";
 import { resolveProviderInstanceTerminalEnvironment } from "./terminal/Manager.ts";
 
 const decodeServerSettings = Schema.decodeUnknownEffect(ServerSettings);
 const decodeServerSettingsJson = Schema.decodeUnknownEffect(Schema.fromJsonString(ServerSettings));
 const decodeServerSettingsPatch = Schema.decodeUnknownEffect(ServerSettingsPatch);
+
+it.effect("merges independent reply rewrite settings edits without resetting saved fields", () =>
+  Effect.gen(function* () {
+    const settings = yield* ServerSettingsModule.ServerSettingsService;
+    yield* settings.updateSettings({
+      replyRewrite: { auto: true, customPrompt: "Keep my style." },
+    });
+    const updated = yield* settings.updateSettings({ replyRewrite: { binaryPath: "custom-pi" } });
+    assert.equal(updated.replyRewrite.auto, true);
+    assert.equal(updated.replyRewrite.customPrompt, "Keep my style.");
+    assert.equal(updated.replyRewrite.binaryPath, "custom-pi");
+    const denied = yield* settings
+      .updateSettings({ replyRewrite: { binaryPath: "unauthorized-pi" } })
+      .pipe(Effect.provideService(OperationScopes, ["settings:write"]), Effect.flip);
+    assert.equal(denied._tag, "ServerSettingsError");
+    assert.equal((yield* settings.getSettings).replyRewrite.binaryPath, "custom-pi");
+  }).pipe(Effect.provide(ServerSettingsModule.layerTest())),
+);
 
 const layerServerSettings = () =>
   ServerSettingsModule.layer.pipe(

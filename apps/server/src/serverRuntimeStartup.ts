@@ -32,6 +32,8 @@ import { flushCompileCache } from "./compileCache.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as EffectWorker from "./orchestration-v2/EffectWorker.ts";
+import * as ReplyRewriteWorker from "./replyRewrite/ReplyRewriteWorker.ts";
+import * as Option from "effect/Option";
 import * as LegacyV1ThreadImporter from "./orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as ProviderRuntimeRecovery from "./orchestration-v2/ProviderRuntimeRecoveryService.ts";
@@ -549,7 +551,16 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       startEffectWorker: runStartupPhase(
         "orchestration-v2.effect-worker.start",
         startEffectWorkerWithRelay({
-          runWorker: EffectWorker.runDaemon,
+          runWorker: Effect.all(
+            [
+              EffectWorker.runDaemon,
+              Effect.gen(function* () {
+                const worker = yield* Effect.serviceOption(ReplyRewriteWorker.ReplyRewriteWorker);
+                return yield* Option.isSome(worker) ? worker.value.runDaemon : Effect.never;
+              }),
+            ],
+            { concurrency: "unbounded", discard: true },
+          ),
           startRelay: agentAwarenessRelay.start(),
           workerFiberRef: effectWorkerFiber,
         }),

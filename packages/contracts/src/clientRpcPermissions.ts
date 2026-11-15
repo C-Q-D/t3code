@@ -17,6 +17,7 @@ import { REPLY_REWRITE_RPC_SCOPES } from "./replyRewrite.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
+  ...REPLY_REWRITE_RPC_SCOPES,
   [WS_METHODS.composerSuggestNext]: AuthOrchestrationOperateScope,
   [WS_METHODS.composerOptimizePrompt]: AuthOrchestrationOperateScope,
   [WS_METHODS.previewClose]: AuthPreviewOperateScope,
