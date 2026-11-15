@@ -2,7 +2,6 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   replyReadingPreferenceAtom,
-  resolveReplyCitationSource,
   resolveReplyReading,
   type ReplyReadingResult,
 } from "@t3tools/client-runtime/state/reply-reading";
@@ -15,7 +14,7 @@ import {
 import * as Cause from "effect/Cause";
 import * as Schema from "effect/Schema";
 import { AsyncResult } from "effect/reactivity";
-import { use, useEffect, useState, type ReactNode } from "react";
+import { use, useState, type ReactNode } from "react";
 import { t } from "~/i18n";
 import { randomUUID } from "~/lib/utils";
 import { replyRewriteEnvironment } from "~/state/replyRewrite";
@@ -25,6 +24,7 @@ import { useV2ItemSupport } from "~/state/v2ItemSupport";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { TimelineRowCtx, type TimelineRow } from "./timelineRowContext";
+import { useReplyCitationReading } from "./useReplyCitationReading";
 
 type ReplyRow = Extract<TimelineRow, { kind: "message" | "assistant-meta" }>;
 type ReadingChildren = (reading: ReplyReadingResult, controls?: ReactNode) => ReactNode;
@@ -158,27 +158,21 @@ function ReplyRewriteReading({
   const available = resolveReplyReading({ ...readingInput, preference: null });
   const citationRequest =
     ctx.citationRequest?.citation.messageId === target.messageId ? ctx.citationRequest : null;
-  const citationSource = citationRequest
-    ? resolveReplyCitationSource(citationRequest.citation, available)
-    : null;
-  const reading = resolveReplyReading({
-    ...readingInput,
-    preference:
-      citationSource === "original" || citationSource === "rewrite" ? citationSource : preference,
-  });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a citation navigation is external input that selects its saved display version
-  useEffect(() => {
-    if (!citationRequest) return;
-    if (citationSource === "unavailable" && !detail.waiting && detail._tag !== "Initial") {
-      citationRequest.onComplete();
+  const citationReading = useReplyCitationReading({
+    request: citationRequest,
+    available,
+    preference,
+    waiting: detail.waiting || detail._tag === "Initial",
+    onSelect: (value) => registry.set(preferenceAtom, value),
+    onUnavailable: () => {
       toastManager.add({
         type: "warning",
         title: t.chat.replyRewrite.versionUnavailable,
         description: t.chat.replyRewrite.savedQuoteAvailable,
       });
-    } else if (citationSource === "original" || citationSource === "rewrite")
-      registry.set(preferenceAtom, citationSource);
-  }, [citationRequest, citationSource, detail.waiting, detail._tag, registry, preferenceAtom]);
+    },
+  });
+  const reading = resolveReplyReading({ ...readingInput, preference: citationReading.preference });
 
   const active = replyRewriteIsActive(record);
   const refresh = () => replyRewriteEnvironment.refresh(queryTarget, registry);
@@ -220,7 +214,7 @@ function ReplyRewriteReading({
           size="xs"
           variant="ghost"
           aria-pressed={reading.source === "original"}
-          onClick={() => registry.set(preferenceAtom, "original")}
+          onClick={() => citationReading.select("original")}
         >
           {t.chat.replyRewrite.original}
         </Button>
@@ -229,7 +223,7 @@ function ReplyRewriteReading({
           variant="ghost"
           aria-pressed={reading.source === "rewrite"}
           disabled={!available.successAvailable}
-          onClick={() => registry.set(preferenceAtom, "rewrite")}
+          onClick={() => citationReading.select("rewrite")}
         >
           {t.chat.replyRewrite.readable}
         </Button>

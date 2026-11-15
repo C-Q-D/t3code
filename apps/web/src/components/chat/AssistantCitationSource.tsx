@@ -98,6 +98,11 @@ export interface AssistantCitationTarget extends AssistantCitationRequest {
     cancelScroll?: () => void;
     pulse?: { startedAt: number; reducedMotion: boolean };
   }>;
+  readingSelection: {
+    isSelected: () => boolean;
+    select: () => void;
+    release: () => void;
+  };
   onComplete: () => void;
 }
 

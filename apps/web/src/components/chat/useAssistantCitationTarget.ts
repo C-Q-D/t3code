@@ -60,12 +60,23 @@ export function useAssistantCitationTarget({
   }
   function createCitationNavigation(next: AssistantCitationRequest): CitationNavigation {
     let done = false;
+    let readingSelected = false;
     const activationRef: AssistantCitationTarget["activationRef"] = {
       current: { scrolled: false, dismissed: false },
     };
     const target: AssistantCitationTarget = {
       ...next,
       activationRef,
+      readingSelection: {
+        isSelected: () => readingSelected,
+        select: () => {
+          readingSelected = true;
+        },
+        release: () => {
+          readingSelected = true;
+          setSettlement({ target, dismissed: true });
+        },
+      },
       onComplete: () => {
         done = true;
         // The thread-open follow can run after the scroll started.
@@ -127,11 +138,13 @@ export function useAssistantCitationTarget({
   const activatedRef = useRef<CitationNavigation | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- retires the replaced citation scroll and activates the new one, releasing the timeline follow
   useEffect(() => {
-    if (activatedRef.current === current) return;
-    activatedRef.current?.retire();
-    activatedRef.current = current;
-    current?.activate();
-  }, [current]);
+    if (activatedRef.current !== current) {
+      activatedRef.current?.retire();
+      activatedRef.current = current;
+      current?.activate();
+    }
+    if (settlement?.target === current?.target && settlement?.dismissed) current?.retire();
+  }, [current, settlement]);
   // Escape and pointerdown dismiss before the viewport mounts; the viewport
   // listeners join once it exists.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes document and viewport listeners that dismiss the pending citation scroll
